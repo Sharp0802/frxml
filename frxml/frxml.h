@@ -66,6 +66,16 @@ namespace frxml
 
         [[nodiscard]]
         const std::vector<dom>& children() const;
+
+
+        [[nodiscard]]
+        static dom element(const std::string& tag, attrmap attr = {}, std::vector<dom> children = {});
+
+        [[nodiscard]]
+        static dom pcinstr(const std::string& target, const std::string& content);
+
+        [[nodiscard]]
+        static dom comment(const std::string& content);
     };
 
     class doc
@@ -76,6 +86,8 @@ namespace frxml
         dom   m_root;
 
     public:
+        doc(dom root);
+
         doc(std::string_view str);
 
         [[nodiscard]]

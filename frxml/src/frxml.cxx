@@ -325,6 +325,37 @@ const std::vector<frxml::dom>& frxml::dom::children() const
     return m_children;
 }
 
+frxml::dom frxml::dom::element(const std::string& tag, attrmap attr, std::vector<dom> children)
+{
+    dom obj;
+    obj.m_type = T_ELEMENT;
+    obj.m_tag = tag;
+    obj.m_attr = std::move(attr);
+    obj.m_children = std::move(children);
+    return obj;
+}
+
+frxml::dom frxml::dom::pcinstr(const std::string& target, const std::string& content)
+{
+    dom obj;
+    obj.m_type = T_PCINSTR;
+    obj.m_tag = target;
+    obj.m_content = content;
+    return obj;
+}
+
+frxml::dom frxml::dom::comment(const std::string& content)
+{
+    dom obj;
+    obj.m_type = T_COMMENT;
+    obj.m_content = content;
+    return obj;
+}
+
+frxml::doc::doc(dom root) : m_error(), m_root(std::move(root))
+{
+}
+
 frxml::doc::doc(std::string_view str) : m_error()
 {
     char_iterator beg{ str.data(), str.size() }, end{ str.data() + str.size(), 0 };
