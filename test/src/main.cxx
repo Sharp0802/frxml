@@ -22,12 +22,14 @@ int main()
 
         std::cout << static_cast<std::string>(doc);
     }
-    std::cout << "\n================================\n";
+    std::cout << "================================\n";
     {
         auto root = frxml::dom::element("xml0", {
             { "xmlns", "test-xmlns" }
         }, {
-            frxml::dom::pcinstr("xml1", "test pcinstr")
+            frxml::dom::comment(" Hello, FRXML! "),
+            frxml::dom::pcinstr("xml1", "test pcinstr"),
+            frxml::dom::element("test-element")
         });
 
         frxml::doc doc{ root };
