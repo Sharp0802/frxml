@@ -4,6 +4,41 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <memory>
+#include <cstring>
+#include <variant>
+
+namespace frxml
+{
+    class safestringview
+    {
+        std::variant<std::shared_ptr<std::string>, std::string_view> m_content;
+
+    public:
+        safestringview();
+
+        // NOLINTNEXTLINE(*-explicit-constructor)
+        safestringview(const std::string& str);
+
+        // NOLINTNEXTLINE(*-explicit-constructor)
+        safestringview(std::string_view view);
+
+        template<int N>
+        // NOLINTNEXTLINE(*-explicit-constructor)
+        safestringview(const char (&str)[N]) : safestringview(std::string_view{ str, strnlen(str, N) })
+        {
+        }
+
+        [[nodiscard]]
+        std::string_view view() const;
+    };
+}
+
+template<>
+struct std::less<frxml::safestringview>
+{
+    bool operator()(const frxml::safestringview& lhs, const frxml::safestringview& rhs) const;
+};
 
 namespace frxml
 {
@@ -39,7 +74,7 @@ namespace frxml
         const char* source;
     };
 
-    using attrmap = std::map<const std::string_view, const std::string_view>;
+    using attrmap = std::map<const safestringview, const safestringview, std::less<safestringview>>;
 
     class dom
     {
@@ -47,8 +82,8 @@ namespace frxml
         friend class doc;
 
         int              m_type;
-        std::string_view m_tag;
-        std::string_view m_content;
+        safestringview   m_tag;
+        safestringview   m_content;
         attrmap          m_attr;
         std::vector<dom> m_children;
 
@@ -59,7 +94,7 @@ namespace frxml
         int type() const;
 
         [[nodiscard]]
-        std::string_view tag() const;
+        safestringview tag() const;
 
         [[nodiscard]]
         const attrmap& attr() const;
