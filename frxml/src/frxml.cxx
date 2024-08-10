@@ -5,7 +5,7 @@
 #include <utility>
 #include <vector>
 #include <sstream>
-#include <string.h>
+#include <cstring>
 
 #include "chariterator.h"
 
@@ -262,13 +262,32 @@ int frxml::domparser::parseelement(char_iterator& cur, const char_iterator end, 
     std::string_view etag;
     if (const auto ret = parseetag(cur, end, etag))
         return ret;
-    if (etag != dom.m_tag)
+    if (etag != dom.m_tag.view())
         return E_INVETAG;
 
     return S_OK;
 }
 
 /************************************************/
+
+frxml::safestringview::safestringview() = default;
+
+frxml::safestringview::safestringview(const std::string& str) : m_content(std::make_shared<std::string>(str))
+{
+}
+
+frxml::safestringview::safestringview(std::string_view view) : m_content(view)
+{
+}
+
+std::string_view frxml::safestringview::view() const
+{
+    if (m_content.index())
+        return std::get<std::string_view>(m_content);
+
+    const auto ptr = std::get<std::shared_ptr<std::string>>(m_content);
+    return { ptr->data(), ptr->size() };
+}
 
 void frxml::dom::tostring(std::stringstream& ss, int indentc) const
 {
@@ -278,11 +297,11 @@ void frxml::dom::tostring(std::stringstream& ss, int indentc) const
     {
         case T_ELEMENT:
         {
-            ss << indent << '<' << m_tag;
-            for (auto [key, value]: m_attr)
+            ss << indent << '<' << m_tag.view();
+            for (const auto& [key, value]: m_attr)
             {
-                const auto quote = value.find('"') == std::string::npos ? '"' : '\'';
-                ss << ' ' << key << '=' << quote << value << quote;
+                const auto quote = value.view().find('"') == std::string::npos ? '"' : '\'';
+                ss << ' ' << key.view() << '=' << quote << value.view() << quote;
             }
 
             if (m_children.empty())
@@ -292,15 +311,15 @@ void frxml::dom::tostring(std::stringstream& ss, int indentc) const
             for (const auto& m_child: m_children)
                 m_child.tostring(ss, indentc + 1);
             if (!m_children.empty())
-                ss << indent << "</" << m_tag << ">\n";
+                ss << indent << "</" << m_tag.view() << ">\n";
 
             break;
         }
         case T_COMMENT:
-            ss << indent << "<!--" << m_content << "-->\n";
+            ss << indent << "<!--" << m_content.view() << "-->\n";
             break;
         case T_PCINSTR:
-            ss << indent << "<?" << m_tag << ' ' << m_content << "?>\n";
+            ss << indent << "<?" << m_tag.view() << ' ' << m_content.view() << "?>\n";
             break;
     }
 }
@@ -310,7 +329,7 @@ int frxml::dom::type() const
     return m_type;
 }
 
-std::string_view frxml::dom::tag() const
+frxml::safestringview frxml::dom::tag() const
 {
     return m_tag;
 }
@@ -386,4 +405,11 @@ frxml::error frxml::doc::error() const
 const frxml::dom& frxml::doc::root() const
 {
     return m_root;
+}
+
+bool std::less<frxml::safestringview>::operator()(
+    const frxml::safestringview& lhs,
+    const frxml::safestringview& rhs) const
+{
+    return lhs.view() < rhs.view();
 }
