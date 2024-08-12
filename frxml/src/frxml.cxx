@@ -344,6 +344,21 @@ const std::vector<frxml::dom>& frxml::dom::children() const
     return m_children;
 }
 
+frxml::safestringview& frxml::dom::tag()
+{
+    return m_tag;
+}
+
+frxml::attrmap& frxml::dom::attr()
+{
+    return m_attr;
+}
+
+std::vector<frxml::dom>& frxml::dom::children()
+{
+    return m_children;
+}
+
 frxml::dom frxml::dom::element(const std::string& tag, attrmap attr, std::vector<dom> children)
 {
     dom obj;
@@ -403,6 +418,11 @@ frxml::error frxml::doc::error() const
 }
 
 const frxml::dom& frxml::doc::root() const
+{
+    return m_root;
+}
+
+frxml::dom& frxml::doc::root()
 {
     return m_root;
 }

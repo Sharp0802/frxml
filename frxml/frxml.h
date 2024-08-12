@@ -102,6 +102,15 @@ namespace frxml
         [[nodiscard]]
         const std::vector<dom>& children() const;
 
+        [[nodiscard]]
+        safestringview& tag();
+
+        [[nodiscard]]
+        attrmap& attr();
+
+        [[nodiscard]]
+        std::vector<dom>& children();
+
 
         [[nodiscard]]
         static dom element(const std::string& tag, attrmap attr = {}, std::vector<dom> children = {});
@@ -136,6 +145,9 @@ namespace frxml
 
         [[nodiscard]]
         const dom& root() const;
+
+        [[nodiscard]]
+        dom& root();
     };
 }
 
