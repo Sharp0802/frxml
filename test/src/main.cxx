@@ -16,9 +16,10 @@ int main()
         frxml::doc doc{ xml };
         if (!doc)
         {
-            auto error = doc.error();
-            std::cout << std::string_view(error.source - 1, 3) << ',' << error.code << '\n';
+            auto [code, source] = doc.error();
+            std::cout << std::string_view(source - 1, 3) << ',' << code << '\n';
         }
+        doc.root().children().push_back(frxml::dom::element("added-elem"));
 
         std::cout << static_cast<std::string>(doc);
     }
@@ -31,6 +32,7 @@ int main()
             frxml::dom::pcinstr("xml1", "test pcinstr"),
             frxml::dom::element("test-element")
         });
+        root.children().push_back(frxml::dom::element("added-elem"));
 
         frxml::doc doc{ root };
         std::cout << static_cast<std::string>(doc);
