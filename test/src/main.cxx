@@ -6,10 +6,10 @@ int main()
     {
         std::string xml = R"(
 <xml0>
-    <xml1 attr="0asdfas" attr0="1"><xml3 />
+    <유니코드 attr="안녕하세요" attr0="1"><xml3 />
 <!-- HELLO! -->
-    </xml1>
-    <?test-pcinstr Hello World!?>
+    </유니코드>
+    <?ユニコードは 好きですか??>
     <xml2 attr="c"/>
 </xml0>
 )";
@@ -29,7 +29,7 @@ int main()
             { "xmlns", "test-xmlns" }
         }, {
             frxml::dom::comment(" Hello, FRXML! "),
-            frxml::dom::pcinstr("xml1", "test pcinstr"),
+            frxml::dom::pcinstr("xml1", "유니코드 유니코드"),
             frxml::dom::element("test-element")
         });
         root.children().push_back(frxml::dom::element("added-elem"));
