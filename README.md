@@ -5,6 +5,7 @@ FRXML is DOM-based light-weight & robust XML parser, written in C++17.
 ## Features
 
 - zero-copy/single-pass parsing
+- UTF-8 supported (without BOM)
 - limited XML 1.0
 
 Currently, FRXML doesn't support XML 1.0 specification yet.
@@ -12,10 +13,6 @@ Below is implemented XML format with EBNF format:
 
 ```ebnf
 document ::= element
-
-          CHAR ::= #x9 | #xA | #xD | [#x20-#x7F]
-NAME_STARTCHAR ::= ":" | [A-Z] | "_" | [a-z]
-     NAME_CHAR ::= NAME_STARTCHAR | "-" | "." | [0-9]
 
 name ::= NAME_STARTCHAR NAME_CHAR*
 
