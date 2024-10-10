@@ -12,6 +12,14 @@ namespace frxml
         return m_size > size;
     }
 
+    size_t char_iterator::skip(size_t size)
+    {
+        size = std::min(size, m_size);
+        m_ptr += size;
+        m_size -= size;
+        return size;
+    }
+
     char_iterator::reference char_iterator::operator*() const
     {
         return *m_ptr;

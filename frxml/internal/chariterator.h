@@ -25,6 +25,11 @@ namespace frxml
         [[nodiscard]]
         bool reserve(size_t size) const;
 
+        /// Skips bytes with specified size
+        /// @param size Size to skip
+        /// @return Skipped size
+        size_t skip(size_t size);
+
 
 
         /// Gets reference of the raw pointer
