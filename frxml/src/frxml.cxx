@@ -18,11 +18,84 @@ std::string_view rangetoview(frxml::char_iterator beg, frxml::char_iterator end)
     };
 }
 
-bool isnamechar(const char ch, int idx)
+int8_t sizeofutf8(frxml::char_iterator& cur)
 {
-    if (isalpha(ch) || ch == '_' || ch == ':')
+    const auto cp = *cur;
+
+    if ((cp & 0x7F) == cp)
+        return 1;
+
+    int8_t length = 0;
+    for (int8_t i = 0; i < 4; ++i)
+    {
+        if ((cp & 0x80 >> i) == 0)
+            break;
+        ++length;
+    }
+
+    if (2 > length || length > 4)
+        return -1;
+
+    return length;
+}
+
+int8_t utf8(frxml::char_iterator cur, char32_t& ch)
+{
+    const auto size = sizeofutf8(cur);
+    if (!cur.reserve(size))
+        return -1;
+
+    if (size == 1)
+    {
+        ch = *cur;
+        return size;
+    }
+
+    ch = *cur & (0xFF >> (size + 1));
+    for (auto i = 1; i < size; ++i)
+    {
+        ch <<= 6;
+        ch |= 0x3F & *++cur;
+    }
+
+    return size;
+}
+
+bool isnamestartchar(const char32_t ch)
+{
+    if (ch == ':' || ch == '_' || isalpha(static_cast<int>(ch)))
         return true;
-    return idx && (isdigit(ch) || ch == '.' || ch == '-');
+
+    return
+        (0x000C0 <= ch && ch <= 0x000D6) ||
+        (0x000D8 <= ch && ch <= 0x000F6) ||
+        (0x000F8 <= ch && ch <= 0x002FF) ||
+        (0x00370 <= ch && ch <= 0x0037D) ||
+        (0x0037F <= ch && ch <= 0x01FFF) ||
+        (0x0200C <= ch && ch <= 0x0200D) ||
+        (0x02070 <= ch && ch <= 0x0218F) ||
+        (0x02C00 <= ch && ch <= 0x02FEF) ||
+        (0x03001 <= ch && ch <= 0x0D7FF) ||
+        (0x0F900 <= ch && ch <= 0x0FDCF) ||
+        (0x0FDF0 <= ch && ch <= 0x0FFFD) ||
+        (0x10000 <= ch && ch <= 0xEFFFF);
+}
+
+bool isnamechar(const char32_t ch, int idx)
+{
+    if (isnamestartchar(ch))
+        return true;
+
+    if (!idx)
+        return false;
+
+    return
+        ch == '-' ||
+        ch == '.' ||
+        isdigit(static_cast<int>(ch)) ||
+        ch == 0xB7 ||
+        (0x0300 <= ch && ch <= 0x036F) ||
+        (0x203F <= ch && ch <= 0x2040);
 }
 
 void skipspace(frxml::char_iterator& cur, const frxml::char_iterator end)
@@ -32,11 +105,28 @@ void skipspace(frxml::char_iterator& cur, const frxml::char_iterator end)
     }
 }
 
-void getname(frxml::char_iterator& cur, const frxml::char_iterator end)
+[[nodiscard]]
+bool getname(frxml::char_iterator& cur, const frxml::char_iterator end)
 {
-    for (auto i = 0; cur != end && isnamechar(*cur, i); ++cur, ++i)
+    for (auto i = 0; cur != end; ++i)
     {
+        char32_t ch;
+
+        const auto size = utf8(cur, ch);
+        if (size < 0)
+            return false;
+
+        if (!isnamechar(ch, size))
+            break;
+
+        cur.skip(size);
     }
+
+    return true;
+
+    //for (auto i = 0; cur != end && isnamechar(*cur, i); ++cur, ++i)
+    //{
+    //}
 }
 
 int parseattr(
@@ -46,7 +136,8 @@ int parseattr(
     std::string_view&          value)
 {
     auto begin = cur;
-    getname(cur, end);
+    if (!getname(cur, end))
+        return frxml::E_INVSEQ;
     if (begin == cur)
         return frxml::E_NONAME;
     name = rangetoview(begin, cur);
@@ -81,7 +172,8 @@ int parseetag(
         return frxml::E_NOTAG;
 
     const auto begin = cur;
-    getname(cur, end);
+    if (!getname(cur, end))
+        return frxml::E_INVSEQ;
     if (begin == cur)
         return frxml::E_NONAME;
     etag = rangetoview(begin, cur);
@@ -127,7 +219,8 @@ int frxml::domparser::parsepcinstr(char_iterator& cur, const char_iterator end, 
         ++cur;
 
     auto begin = cur;
-    getname(cur, end);
+    if (!getname(cur, end))
+        return frxml::E_INVSEQ;
     if (begin == cur)
         return E_NONAME;
     dom.m_tag = rangetoview(begin, cur);
@@ -183,7 +276,8 @@ int frxml::domparser::parseelement(char_iterator& cur, const char_iterator end, 
         return E_NOTAG;
 
     const auto begin = cur;
-    getname(cur, end);
+    if (!getname(cur, end))
+        return frxml::E_INVSEQ;
     if (begin == cur)
         return E_NONAME;
     dom.m_tag = rangetoview(begin, cur);

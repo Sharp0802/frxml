@@ -53,6 +53,7 @@ namespace frxml
         E_QUOTENOTCLOSED,
 
         E_INVCHAR,
+        E_INVSEQ,
 
         E_NOTAG,
         E_TAGNOTCLOSED,
