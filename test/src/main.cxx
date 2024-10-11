@@ -5,6 +5,9 @@ int main()
 {
     {
         std::string xml = R"(
+<?xml version="1.0" encoding="UTF-8"?>
+<?ユニコードは 好きですか??>
+<!-- HELLO! -->
 <xml0>
     <유니코드 attr="안녕하세요" attr0="1"><xml3 />
 <!-- HELLO! -->
@@ -12,6 +15,7 @@ int main()
     <?ユニコードは 好きですか??>
     <xml2 attr="c"/>
 </xml0>
+<!-- HELLO! -->
 )";
         frxml::doc doc{ xml };
         if (!doc)
@@ -19,7 +23,7 @@ int main()
             auto [code, source] = doc.error();
             std::cout << std::string_view(source - 1, 3) << ',' << code << '\n';
         }
-        doc.root().children().push_back(frxml::dom::element("added-elem"));
+        //doc.children().push_back(frxml::dom::element("added-elem"));
 
         std::cout << static_cast<std::string>(doc);
     }
@@ -34,7 +38,7 @@ int main()
         });
         root.children().push_back(frxml::dom::element("added-elem"));
 
-        frxml::doc doc{ root };
+        frxml::doc doc{ { root } };
         std::cout << static_cast<std::string>(doc);
     }
 }
