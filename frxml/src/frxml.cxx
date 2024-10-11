@@ -63,11 +63,22 @@ int8_t utf8(frxml::char_iterator cur, char32_t& ch)
 
 bool isnamestartchar(const char32_t ch)
 {
+    if (ch == ':' || ch == '_' || isalpha(static_cast<int>(ch)))
+        return true;
+
     return
-        ch == 0x20 || ch == 0x0A || ch == 0x0D ||
-        (0x00020 <= ch && ch <= 0x0D7FF) ||
-        (0x0E000 <= ch && ch <= 0x0FFFD) ||
-        (0x10000 <= ch && ch <= 0x10FFF);
+        (0x000C0 <= ch && ch <= 0x000D6) ||
+        (0x000D8 <= ch && ch <= 0x000F6) ||
+        (0x000F8 <= ch && ch <= 0x002FF) ||
+        (0x00370 <= ch && ch <= 0x0037D) ||
+        (0x0037F <= ch && ch <= 0x01FFF) ||
+        (0x0200C <= ch && ch <= 0x0200D) ||
+        (0x02070 <= ch && ch <= 0x0218F) ||
+        (0x02C00 <= ch && ch <= 0x02FEF) ||
+        (0x03001 <= ch && ch <= 0x0D7FF) ||
+        (0x0F900 <= ch && ch <= 0x0FDCF) ||
+        (0x0FDF0 <= ch && ch <= 0x0FFFD) ||
+        (0x10000 <= ch && ch <= 0xEFFFF);
 }
 
 bool isnamechar(const char32_t ch, int idx)
