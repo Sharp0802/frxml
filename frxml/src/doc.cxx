@@ -25,7 +25,8 @@ frxml::doc::doc(std::string_view str) : m_error()
     if (error == S_OK)
         m_children.emplace_back(xmlDecl);
 
-    if ((error = domparser::ParseMiscVec(beg, end, m_children)) != S_OK)
+    error = domparser::ParseMiscVec(beg, end, m_children);
+    if (error != S_OK && error != E_NOTAG)
     {
         m_error = { error, beg.operator->() };
         return;

@@ -277,8 +277,7 @@ int frxml::domparser::ParseComment(char_iterator& cur, const char_iterator end, 
 {
     if (!cur.reserve(4) || memcmp(cur.operator->(), "<!--", 4) != 0)
         return E_NOTAG;
-    for (auto i = 0; i < 4; ++i)
-        ++cur;
+    cur.skip(4);
 
     const auto begin = cur;
     while (true)

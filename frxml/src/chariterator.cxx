@@ -9,7 +9,7 @@ namespace frxml
 
     bool char_iterator::reserve(size_t size) const
     {
-        return m_size > size;
+        return m_size >= size;
     }
 
     size_t char_iterator::skip(size_t size)
