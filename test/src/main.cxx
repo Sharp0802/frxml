@@ -47,14 +47,14 @@ int main()
     static char    buf[1048576];
     static ssize_t size;
 
-    std::cout << "Size (KB), Depth, FRXML (ms), LibXml2 (DOM, ms), PugiXML (ms)" << std::endl;
+    std::cout << "Size (KB),\tDepth,\tFRXML (ms),\tPugiXML (ms),\tLibXml2 (DOM, ms)" << std::endl;
 
     for (std::string file: {
              "1, 3",
-             "1, 10",
              "10, 3",
-             "10, 10",
              "50, 3",
+             "1, 10",
+             "10, 10",
              "50, 10"
          })
     {
@@ -96,7 +96,7 @@ int main()
                 pugi::xml_parse_result result = doc.load_string(buf, pugi::parse_default | pugi::encoding_utf8);
         });
 
-        std::cout << file << ", " << frxml << ", " << libxml << ", " << pugixml << std::endl;
+        std::cout << file << ",\t" << frxml << ",\t" << pugixml << ",\t" << libxml << std::endl;
 
         if (code != 0)
             std::cerr << "Exited with code: " << code << std::endl;
