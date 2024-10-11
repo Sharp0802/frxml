@@ -94,8 +94,6 @@ namespace frxml
         FRXML_EXPORT void tostring(std::stringstream& ss, int indent) const;
 
     public:
-        FRXML_EXPORT ~dom();
-
         [[nodiscard]]
         FRXML_EXPORT int type() const;
 
