@@ -13,7 +13,7 @@ frxml::doc::doc(std::string_view str) : m_error()
     char_iterator beg{ str.data(), str.size() }, end{ str.data() + str.size(), 0 };
 
     m_root.m_type   = T_ELEMENT;
-    const auto code = domparser::parseelement(beg, end, m_root);
+    const auto code = domparser::ParseElement(beg, end, m_root);
 
     m_error = { code, beg.operator->() };
 }

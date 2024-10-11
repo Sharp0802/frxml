@@ -9,25 +9,25 @@ namespace frxml
     {
     public:
         [[nodiscard]]
-        static int parseelementlike(
+        static int ParseElementLike(
             char_iterator& cur,
             char_iterator  end,
             dom&           dom);
 
         [[nodiscard]]
-        static int parsepcinstr(
+        static int ParsePI(
             char_iterator& cur,
             char_iterator  end,
             dom&           dom);
 
         [[nodiscard]]
-        static int parsecomment(
+        static int ParseComment(
             char_iterator& cur,
             char_iterator  end,
             dom&           dom);
 
         [[nodiscard]]
-        static int parseelement(
+        static int ParseElement(
             char_iterator& cur,
             char_iterator  end,
             dom&           dom);

@@ -10,7 +10,7 @@
 #include "chariterator.h"
 #include "domparser.h"
 
-std::string_view rangetoview(frxml::char_iterator beg, frxml::char_iterator end)
+std::string_view RangeToView(frxml::char_iterator beg, frxml::char_iterator end)
 {
     return {
         beg.operator->(),
@@ -18,7 +18,7 @@ std::string_view rangetoview(frxml::char_iterator beg, frxml::char_iterator end)
     };
 }
 
-int8_t sizeofutf8(frxml::char_iterator& cur)
+int8_t SizeOfUTF8(frxml::char_iterator& cur)
 {
     const auto cp = *cur;
 
@@ -39,9 +39,9 @@ int8_t sizeofutf8(frxml::char_iterator& cur)
     return length;
 }
 
-int8_t utf8(frxml::char_iterator cur, char32_t& ch)
+int8_t UTF8(frxml::char_iterator cur, char32_t& ch)
 {
-    const auto size = sizeofutf8(cur);
+    const auto size = SizeOfUTF8(cur);
     if (!cur.reserve(size))
         return -1;
 
@@ -61,7 +61,7 @@ int8_t utf8(frxml::char_iterator cur, char32_t& ch)
     return size;
 }
 
-bool isnamestartchar(const char32_t ch)
+bool IsNameStartChar(const char32_t ch)
 {
     if (ch == ':' || ch == '_' || isalpha(static_cast<int>(ch)))
         return true;
@@ -81,9 +81,9 @@ bool isnamestartchar(const char32_t ch)
         (0x10000 <= ch && ch <= 0xEFFFF);
 }
 
-bool isnamechar(const char32_t ch, int idx)
+bool IsNameChar(const char32_t ch, int idx)
 {
-    if (isnamestartchar(ch))
+    if (IsNameStartChar(ch))
         return true;
 
     if (!idx)
@@ -98,7 +98,7 @@ bool isnamechar(const char32_t ch, int idx)
         (0x203F <= ch && ch <= 0x2040);
 }
 
-void skipspace(frxml::char_iterator& cur, const frxml::char_iterator end)
+void SkipSpace(frxml::char_iterator& cur, const frxml::char_iterator end)
 {
     for (; cur != end && isspace(*cur); ++cur)
     {
@@ -106,17 +106,17 @@ void skipspace(frxml::char_iterator& cur, const frxml::char_iterator end)
 }
 
 [[nodiscard]]
-bool getname(frxml::char_iterator& cur, const frxml::char_iterator end)
+bool GetName(frxml::char_iterator& cur, const frxml::char_iterator end)
 {
     for (auto i = 0; cur != end; ++i)
     {
         char32_t ch;
 
-        const auto size = utf8(cur, ch);
+        const auto size = UTF8(cur, ch);
         if (size < 0)
             return false;
 
-        if (!isnamechar(ch, size))
+        if (!IsNameChar(ch, size))
             break;
 
         cur.skip(size);
@@ -129,18 +129,18 @@ bool getname(frxml::char_iterator& cur, const frxml::char_iterator end)
     //}
 }
 
-int parseattr(
+int ParseAttribute(
     frxml::char_iterator&      cur,
     const frxml::char_iterator end,
     std::string_view&          name,
     std::string_view&          value)
 {
     auto begin = cur;
-    if (!getname(cur, end))
+    if (!GetName(cur, end))
         return frxml::E_INVSEQ;
     if (begin == cur)
         return frxml::E_NONAME;
-    name = rangetoview(begin, cur);
+    name = RangeToView(begin, cur);
 
     if (!cur.reserve(1) || *cur++ != '=')
         return frxml::E_NOEQ;
@@ -157,13 +157,13 @@ int parseattr(
     }
     if (cur == end)
         return frxml::E_QUOTENOTCLOSED;
-    value = rangetoview(begin, cur);
+    value = RangeToView(begin, cur);
     ++cur;
 
     return frxml::S_OK;
 }
 
-int parseetag(
+int ParseETag(
     frxml::char_iterator&      cur,
     const frxml::char_iterator end,
     std::string_view&          etag)
@@ -172,13 +172,13 @@ int parseetag(
         return frxml::E_NOTAG;
 
     const auto begin = cur;
-    if (!getname(cur, end))
+    if (!GetName(cur, end))
         return frxml::E_INVSEQ;
     if (begin == cur)
         return frxml::E_NONAME;
-    etag = rangetoview(begin, cur);
+    etag = RangeToView(begin, cur);
 
-    skipspace(cur, end);
+    SkipSpace(cur, end);
     if (!cur.reserve(1) || *cur++ != '>')
         return frxml::E_TAGNOTCLOSED;
 
@@ -187,9 +187,9 @@ int parseetag(
 
 /************************************************/
 
-int frxml::domparser::parseelementlike(char_iterator& cur, const char_iterator end, dom& dom)
+int frxml::domparser::ParseElementLike(char_iterator& cur, const char_iterator end, dom& dom)
 {
-    skipspace(cur, end);
+    SkipSpace(cur, end);
 
     if (!cur.reserve(3) || *cur != '<')
         return E_NOTAG;
@@ -199,19 +199,19 @@ int frxml::domparser::parseelementlike(char_iterator& cur, const char_iterator e
     if (memcmp(p, "<!-", 3) == 0)
     {
         dom.m_type = T_COMMENT;
-        return parsecomment(cur, end, dom);
+        return ParseComment(cur, end, dom);
     }
     if (memcmp(p, "<?", 2) == 0)
     {
         dom.m_type = T_PCINSTR;
-        return parsepcinstr(cur, end, dom);
+        return ParsePI(cur, end, dom);
     }
 
     dom.m_type = T_ELEMENT;
-    return parseelement(cur, end, dom);
+    return ParseElement(cur, end, dom);
 }
 
-int frxml::domparser::parsepcinstr(char_iterator& cur, const char_iterator end, dom& dom)
+int frxml::domparser::ParsePI(char_iterator& cur, const char_iterator end, dom& dom)
 {
     if (!cur.reserve(2) || memcmp(cur.operator->(), "<?", 2) != 0)
         return E_NOTAG;
@@ -219,13 +219,13 @@ int frxml::domparser::parsepcinstr(char_iterator& cur, const char_iterator end, 
         ++cur;
 
     auto begin = cur;
-    if (!getname(cur, end))
+    if (!GetName(cur, end))
         return frxml::E_INVSEQ;
     if (begin == cur)
         return E_NONAME;
-    dom.m_tag = rangetoview(begin, cur);
+    dom.m_tag = RangeToView(begin, cur);
 
-    skipspace(cur, end);
+    SkipSpace(cur, end);
 
     begin = cur;
     while (true)
@@ -236,14 +236,14 @@ int frxml::domparser::parsepcinstr(char_iterator& cur, const char_iterator end, 
             break;
         ++cur;
     }
-    dom.m_content = rangetoview(begin, cur);
+    dom.m_content = RangeToView(begin, cur);
 
     for (auto i = 0; i < 2; ++i)
         ++cur;
     return S_OK;
 }
 
-int frxml::domparser::parsecomment(char_iterator& cur, const char_iterator end, dom& dom)
+int frxml::domparser::ParseComment(char_iterator& cur, const char_iterator end, dom& dom)
 {
     if (!cur.reserve(4) || memcmp(cur.operator->(), "<!--", 4) != 0)
         return E_NOTAG;
@@ -259,7 +259,7 @@ int frxml::domparser::parsecomment(char_iterator& cur, const char_iterator end, 
             break;
         ++cur;
     }
-    dom.m_content = rangetoview(begin, cur);
+    dom.m_content = RangeToView(begin, cur);
 
     for (auto i = 0; i < 2; ++i)
         ++cur;
@@ -269,29 +269,29 @@ int frxml::domparser::parsecomment(char_iterator& cur, const char_iterator end, 
     return S_OK;
 }
 
-int frxml::domparser::parseelement(char_iterator& cur, const char_iterator end, dom& dom)
+int frxml::domparser::ParseElement(char_iterator& cur, const char_iterator end, dom& dom)
 {
-    skipspace(cur, end);
+    SkipSpace(cur, end);
     if (!cur.reserve(1) || *cur++ != '<')
         return E_NOTAG;
 
     const auto begin = cur;
-    if (!getname(cur, end))
+    if (!GetName(cur, end))
         return frxml::E_INVSEQ;
     if (begin == cur)
         return E_NONAME;
-    dom.m_tag = rangetoview(begin, cur);
+    dom.m_tag = RangeToView(begin, cur);
 
     while (cur.reserve(1) && isspace(*cur))
     {
-        skipspace(cur, end);
+        SkipSpace(cur, end);
         if (cur == end)
             return E_TAGNOTCLOSED;
 
-        if (isnamechar(*cur, 0))
+        if (IsNameChar(*cur, 0))
         {
             std::string_view name, value;
-            if (auto ret = parseattr(cur, end, name, value))
+            if (auto ret = ParseAttribute(cur, end, name, value))
                 return ret;
             if (dom.m_attr.count(name))
                 return E_DUPATTR;
@@ -311,7 +311,7 @@ int frxml::domparser::parseelement(char_iterator& cur, const char_iterator end, 
 
     while (cur != end)
     {
-        skipspace(cur, end);
+        SkipSpace(cur, end);
         if (!cur.reserve(2))
             return E_ELEMNOTCLOSED;
 
@@ -319,12 +319,12 @@ int frxml::domparser::parseelement(char_iterator& cur, const char_iterator end, 
             break;
 
         auto& child = dom.m_children.emplace_back();
-        if (const auto ret = parseelementlike(cur, end, child))
+        if (const auto ret = ParseElementLike(cur, end, child))
             return ret;
     }
 
     std::string_view etag;
-    if (const auto ret = parseetag(cur, end, etag))
+    if (const auto ret = ParseETag(cur, end, etag))
         return ret;
     if (etag != dom.m_tag.view())
         return E_INVETAG;
