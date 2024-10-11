@@ -10,7 +10,15 @@
 #include "chariterator.h"
 #include "domparser.h"
 
-std::string_view RangeToView(frxml::char_iterator beg, frxml::char_iterator end)
+constexpr int memcmp_(const char* __restrict a, const char* __restrict b)
+{
+    for (; *a && *b; a++, b++)
+        if (*a != *b)
+            return -1;
+    return 0;
+}
+
+inline std::string_view RangeToView(frxml::char_iterator beg, frxml::char_iterator end)
 {
     return {
         beg.operator->(),
@@ -183,7 +191,7 @@ int frxml::domparser::ParseMiscVec(char_iterator& cur, char_iterator& end, std::
     int error = 0;
     while (error == S_OK)
         if (dom misc; (error = ParseMisc(cur, end, misc)) == S_OK)
-            vec.push_back(misc);
+            vec.emplace_back(misc);
 
     return error == E_SKIPPED ? S_OK : error;
 }
@@ -197,12 +205,12 @@ int frxml::domparser::ParseMisc(char_iterator& cur, char_iterator end, dom& dom)
 
     auto p = cur.operator->();
 
-    if (memcmp(p, "<!-", 3) == 0)
+    if (memcmp_(p, "<!-") == 0)
     {
         dom.m_type = T_COMMENT;
         return ParseComment(cur, end, dom);
     }
-    if (memcmp(p, "<?", 2) == 0)
+    if (memcmp_(p, "<?") == 0)
     {
         dom.m_type = T_PCINSTR;
         return ParsePI(cur, end, dom);
@@ -215,17 +223,16 @@ int frxml::domparser::ParseElementLike(char_iterator& cur, const char_iterator e
 {
     SkipSpace(cur, end);
 
-    if (!cur.reserve(3) || *cur != '<')
+    auto p = cur.operator->();
+    if (!cur.reserve(3) || *p != '<')
         return E_NOTAG;
 
-    auto p = cur.operator->();
-
-    if (memcmp(p, "<!-", 3) == 0)
+    if (memcmp_(p, "<!-") == 0)
     {
         dom.m_type = T_COMMENT;
         return ParseComment(cur, end, dom);
     }
-    if (memcmp(p, "<?", 2) == 0)
+    if (memcmp_(p, "<?") == 0)
     {
         dom.m_type = T_PCINSTR;
         return ParsePI(cur, end, dom);
@@ -237,7 +244,7 @@ int frxml::domparser::ParseElementLike(char_iterator& cur, const char_iterator e
 
 int frxml::domparser::ParsePI(char_iterator& cur, const char_iterator end, dom& dom)
 {
-    if (!cur.reserve(2) || memcmp(cur.operator->(), "<?", 2) != 0)
+    if (!cur.reserve(2) || memcmp_(cur.operator->(), "<?") != 0)
         return E_NOTAG;
     for (auto i = 0; i < 2; ++i)
         ++cur;
@@ -256,7 +263,7 @@ int frxml::domparser::ParsePI(char_iterator& cur, const char_iterator end, dom& 
     {
         if (!cur.reserve(2))
             return E_TAGNOTCLOSED;
-        if (memcmp(cur.operator->(), "?>", 2) == 0)
+        if (memcmp_(cur.operator->(), "?>") == 0)
             break;
         ++cur;
     }
@@ -270,7 +277,7 @@ int frxml::domparser::ParsePI(char_iterator& cur, const char_iterator end, dom& 
 
 int frxml::domparser::ParseComment(char_iterator& cur, const char_iterator end, dom& dom)
 {
-    if (!cur.reserve(4) || memcmp(cur.operator->(), "<!--", 4) != 0)
+    if (!cur.reserve(4) || memcmp_(cur.operator->(), "<!--") != 0)
         return E_NOTAG;
     cur.skip(4);
 
@@ -279,7 +286,7 @@ int frxml::domparser::ParseComment(char_iterator& cur, const char_iterator end, 
     {
         if (!cur.reserve(2))
             return E_TAGNOTCLOSED;
-        if (memcmp(cur.operator->(), "--", 2) == 0)
+        if (memcmp_(cur.operator->(), "--") == 0)
             break;
         ++cur;
     }
