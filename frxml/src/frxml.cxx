@@ -22,27 +22,22 @@ int8_t SizeOfUTF8(frxml::char_iterator& cur)
 {
     const auto cp = *cur;
 
-    if ((cp & 0x7F) == cp)
+    if ((cp & 0x80) == 0)  // 1-byte character (ASCII)
         return 1;
+    if ((cp & 0xE0) == 0xC0)  // 2-byte character
+        return 2;
+    if ((cp & 0xF0) == 0xE0)  // 3-byte character
+        return 3;
+    if ((cp & 0xF8) == 0xF0)  // 4-byte character
+        return 4;
 
-    int8_t length = 0;
-    for (int8_t i = 0; i < 4; ++i)
-    {
-        if ((cp & 0x80 >> i) == 0)
-            break;
-        ++length;
-    }
-
-    if (2 > length || length > 4)
-        return -1;
-
-    return length;
+    return -1;  // Invalid UTF-8
 }
 
 int8_t UTF8(frxml::char_iterator cur, char32_t& ch)
 {
     const auto size = SizeOfUTF8(cur);
-    if (!cur.reserve(size))
+    if (size == -1 || !cur.reserve(size))
         return -1;
 
     if (size == 1)
@@ -52,10 +47,10 @@ int8_t UTF8(frxml::char_iterator cur, char32_t& ch)
     }
 
     ch = *cur & (0xFF >> (size + 1));
-    for (auto i = 1; i < size; ++i)
+    for (int8_t i = 1; i < size; ++i)
     {
         ch <<= 6;
-        ch |= 0x3F & *++cur;
+        ch |= (*++cur & 0x3F);  // Mask with 0x3F to get last 6 bits
     }
 
     return size;
