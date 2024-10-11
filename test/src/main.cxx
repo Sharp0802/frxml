@@ -75,7 +75,7 @@ int main()
         });
 
         double libxml;
-        if (size > 1024)
+        if (size > 10240)
         {
             libxml = -1;
         }
