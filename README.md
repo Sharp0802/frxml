@@ -8,15 +8,23 @@ FRXML is DOM-based light-weight & robust XML parser, written in C++17.
 - UTF-8 supported (without BOM)
 - limited XML 1.0
 
+## Limitation
+
+- No `<! ... >` things such as `<!DOCTYPE ...` or `<!ENTITY ...` etc...
+- No entity(`&lt;`, `&#x20`) encoder/decoder
+
 Currently, FRXML doesn't support XML 1.0 specification yet.
 Below is implemented XML format with EBNF format:
 
 ```ebnf
-document ::= element
+document ::= prolog misc* element misc*
+
+prolog ::= pcinstr? /* XML declaration is subset of pcinstr */
 
 name ::= NAME_STARTCHAR NAME_CHAR*
 
-node ::= element | comment | pcinstr
+node ::= element | misc
+misc ::= comment | pcinstr | S
 
       element ::= norm_element | empty_element
  norm_element ::= '<' name (S attr)* S? '>' content '</' name '>'
@@ -38,13 +46,17 @@ content ::= node (S? content)?
 int main()
 {
     std::string xml = R"(
-<xml0>
-    <xml1 attr="0asdfas" attr0="1"><xml3 />
+<?xml version="1.0" encoding="UTF-8"?>
+<?ユニコードは 好きですか??>
 <!-- HELLO! -->
-    </xml1>
-    <?test-pcinstr Hello World!?>
+<xml0>
+    <유니코드 attr="안녕하세요" attr0="1"><xml3 />
+<!-- HELLO! -->
+    </유니코드>
+    <?ユニコードは 好きですか??>
     <xml2 attr="c"/>
 </xml0>
+<!-- HELLO! -->
 )";
     frxml::doc doc{ xml };
     if (!doc)
@@ -60,14 +72,18 @@ int main()
 - Result
 
 ```
+<?xml version="1.0" encoding="UTF-8"?>
+<?ユニコードは 好きですか??>
+<!-- HELLO! -->
 <xml0>
-	<xml1 attr="0asdfas" attr0="1">
+	<유니코드 attr="안녕하세요" attr0="1">
 		<xml3/>
 		<!-- HELLO! -->
-	</xml1>
-	<?test-pcinstr Hello World!?>
+	</유니코드>
+	<?ユニコードは 好きですか??>
 	<xml2 attr="c"/>
 </xml0>
+<!-- HELLO! -->
 ```
 
 ### Manipulation
@@ -86,7 +102,7 @@ int main()
         frxml::dom::element("test-element")
     });
 
-    frxml::doc doc{ root };
+    frxml::doc doc{ { root } };
     std::cout << static_cast<std::string>(doc);
 }
 ```
