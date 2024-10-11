@@ -8,6 +8,8 @@
 #include <cstring>
 #include <variant>
 
+#define FRXML_EXPORT __attribute__((visibility("default")))
+
 namespace frxml
 {
     class safestringview
@@ -15,13 +17,13 @@ namespace frxml
         std::variant<std::shared_ptr<std::string>, std::string_view> m_content;
 
     public:
-        safestringview();
+        FRXML_EXPORT safestringview();
 
         // NOLINTNEXTLINE(*-explicit-constructor)
-        safestringview(const std::string& str);
+        FRXML_EXPORT safestringview(const std::string& str);
 
         // NOLINTNEXTLINE(*-explicit-constructor)
-        safestringview(std::string_view view);
+        FRXML_EXPORT safestringview(std::string_view view);
 
         template<int N>
         // NOLINTNEXTLINE(*-explicit-constructor)
@@ -30,7 +32,7 @@ namespace frxml
         }
 
         [[nodiscard]]
-        std::string_view view() const;
+        FRXML_EXPORT std::string_view view() const;
     };
 }
 
@@ -89,39 +91,41 @@ namespace frxml
         attrmap          m_attr;
         std::vector<dom> m_children;
 
-        void tostring(std::stringstream& ss, int indent) const;
+        FRXML_EXPORT void tostring(std::stringstream& ss, int indent) const;
 
     public:
-        [[nodiscard]]
-        int type() const;
+        FRXML_EXPORT ~dom();
 
         [[nodiscard]]
-        safestringview tag() const;
+        FRXML_EXPORT int type() const;
 
         [[nodiscard]]
-        const attrmap& attr() const;
+        FRXML_EXPORT safestringview tag() const;
 
         [[nodiscard]]
-        const std::vector<dom>& children() const;
+        FRXML_EXPORT const attrmap& attr() const;
 
         [[nodiscard]]
-        safestringview& tag();
+        FRXML_EXPORT const std::vector<dom>& children() const;
 
         [[nodiscard]]
-        attrmap& attr();
+        FRXML_EXPORT safestringview& tag();
 
         [[nodiscard]]
-        std::vector<dom>& children();
+        FRXML_EXPORT attrmap& attr();
+
+        [[nodiscard]]
+        FRXML_EXPORT std::vector<dom>& children();
 
 
         [[nodiscard]]
-        static dom element(const std::string& tag, attrmap attr = {}, std::vector<dom> children = {});
+        FRXML_EXPORT static dom element(const std::string& tag, attrmap attr = {}, std::vector<dom> children = {});
 
         [[nodiscard]]
-        static dom pcinstr(const std::string& target, const std::string& content);
+        FRXML_EXPORT static dom pcinstr(const std::string& target, const std::string& content);
 
         [[nodiscard]]
-        static dom comment(const std::string& content);
+        FRXML_EXPORT static dom comment(const std::string& content);
     };
 
     class doc
@@ -132,30 +136,30 @@ namespace frxml
         std::vector<dom> m_children;
 
     public:
-        doc(std::vector<dom> root);
+        FRXML_EXPORT doc(std::vector<dom> root);
 
-        doc(std::string_view str);
-
-        [[nodiscard]]
-        operator std::string() const;
+        FRXML_EXPORT doc(std::string_view str);
 
         [[nodiscard]]
-        bool operator!() const;
+        FRXML_EXPORT operator std::string() const;
 
         [[nodiscard]]
-        error error() const;
+        FRXML_EXPORT bool operator!() const;
 
         [[nodiscard]]
-        const std::vector<dom>& children() const;
+        FRXML_EXPORT error error() const;
 
         [[nodiscard]]
-        std::vector<dom>& children();
+        FRXML_EXPORT const std::vector<dom>& children() const;
 
         [[nodiscard]]
-        const dom& root() const;
+        FRXML_EXPORT std::vector<dom>& children();
 
         [[nodiscard]]
-        dom& root();
+        FRXML_EXPORT const dom& root() const;
+
+        [[nodiscard]]
+        FRXML_EXPORT dom& root();
     };
 }
 
