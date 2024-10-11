@@ -9,6 +9,18 @@ namespace frxml
     {
     public:
         [[nodiscard]]
+        static int ParseMiscVec(
+            char_iterator&    cur,
+            char_iterator&    end,
+            std::vector<dom>& vec);
+
+        [[nodiscard]]
+        static int ParseMisc(
+            char_iterator& cur,
+            char_iterator  end,
+            dom&           dom);
+
+        [[nodiscard]]
         static int ParseElementLike(
             char_iterator& cur,
             char_iterator  end,

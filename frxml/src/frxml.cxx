@@ -123,10 +123,6 @@ bool GetName(frxml::char_iterator& cur, const frxml::char_iterator end)
     }
 
     return true;
-
-    //for (auto i = 0; cur != end && isnamechar(*cur, i); ++cur, ++i)
-    //{
-    //}
 }
 
 int ParseAttribute(
@@ -187,6 +183,39 @@ int ParseETag(
 
 /************************************************/
 
+int frxml::domparser::ParseMiscVec(char_iterator& cur, char_iterator& end, std::vector<dom>& vec)
+{
+    int error = 0;
+    while (error == S_OK)
+        if (dom misc; (error = ParseMisc(cur, end, misc)) == S_OK)
+            vec.push_back(misc);
+
+    return error == E_SKIPPED ? S_OK : error;
+}
+
+int frxml::domparser::ParseMisc(char_iterator& cur, char_iterator end, dom& dom)
+{
+    SkipSpace(cur, end);
+
+    if (!cur.reserve(3) || *cur != '<')
+        return E_NOTAG;
+
+    auto p = cur.operator->();
+
+    if (memcmp(p, "<!-", 3) == 0)
+    {
+        dom.m_type = T_COMMENT;
+        return ParseComment(cur, end, dom);
+    }
+    if (memcmp(p, "<?", 2) == 0)
+    {
+        dom.m_type = T_PCINSTR;
+        return ParsePI(cur, end, dom);
+    }
+
+    return E_SKIPPED;
+}
+
 int frxml::domparser::ParseElementLike(char_iterator& cur, const char_iterator end, dom& dom)
 {
     SkipSpace(cur, end);
@@ -220,7 +249,7 @@ int frxml::domparser::ParsePI(char_iterator& cur, const char_iterator end, dom& 
 
     auto begin = cur;
     if (!GetName(cur, end))
-        return frxml::E_INVSEQ;
+        return E_INVSEQ;
     if (begin == cur)
         return E_NONAME;
     dom.m_tag = RangeToView(begin, cur);
@@ -240,6 +269,7 @@ int frxml::domparser::ParsePI(char_iterator& cur, const char_iterator end, dom& 
 
     for (auto i = 0; i < 2; ++i)
         ++cur;
+
     return S_OK;
 }
 
@@ -277,7 +307,7 @@ int frxml::domparser::ParseElement(char_iterator& cur, const char_iterator end, 
 
     const auto begin = cur;
     if (!GetName(cur, end))
-        return frxml::E_INVSEQ;
+        return E_INVSEQ;
     if (begin == cur)
         return E_NONAME;
     dom.m_tag = RangeToView(begin, cur);

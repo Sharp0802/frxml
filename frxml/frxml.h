@@ -45,6 +45,7 @@ namespace frxml
     enum
     {
         S_OK,
+        E_SKIPPED,
 
         E_NONAME,
 
@@ -127,11 +128,11 @@ namespace frxml
     {
         friend class domparser;
 
-        error m_error;
-        dom   m_root;
+        error            m_error;
+        std::vector<dom> m_children;
 
     public:
-        doc(dom root);
+        doc(std::vector<dom> root);
 
         doc(std::string_view str);
 
@@ -143,6 +144,12 @@ namespace frxml
 
         [[nodiscard]]
         error error() const;
+
+        [[nodiscard]]
+        const std::vector<dom>& children() const;
+
+        [[nodiscard]]
+        std::vector<dom>& children();
 
         [[nodiscard]]
         const dom& root() const;
