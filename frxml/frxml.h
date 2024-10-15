@@ -1,163 +1,125 @@
 #ifndef FRXML_LIBRARY_H
 #define FRXML_LIBRARY_H
 
-#include <map>
 #include <string>
-#include <vector>
 #include <memory>
-#include <cstring>
 #include <variant>
+#include <vector>
 
 #define FRXML_EXPORT __attribute__((visibility("default")))
 
 namespace frxml
 {
-    class safestringview
+    class comment
     {
-        std::variant<std::shared_ptr<std::string>, std::string_view> m_content;
+        std::string_view m_value;
 
     public:
-        FRXML_EXPORT safestringview();
-
-        // NOLINTNEXTLINE(*-explicit-constructor)
-        FRXML_EXPORT safestringview(const std::string& str);
-
-        // NOLINTNEXTLINE(*-explicit-constructor)
-        FRXML_EXPORT safestringview(std::string_view view);
-
-        template<int N>
-        // NOLINTNEXTLINE(*-explicit-constructor)
-        safestringview(const char (&str)[N]) : safestringview(std::string_view{ str, strnlen(str, N) })
+        explicit comment(const std::string_view& value) : m_value(value)
         {
         }
 
-        [[nodiscard]]
-        FRXML_EXPORT std::string_view view() const;
-    };
-}
-
-template<>
-struct std::less<frxml::safestringview>
-{
-    bool operator()(const frxml::safestringview& lhs, const frxml::safestringview& rhs) const;
-};
-
-namespace frxml
-{
-    enum
-    {
-        S_OK,
-        E_SKIPPED,
-
-        E_NONAME,
-
-        E_NOEQ,
-        E_NOQUOTE,
-        E_QUOTENOTCLOSED,
-
-        E_INVCHAR,
-        E_INVSEQ,
-
-        E_NOTAG,
-        E_TAGNOTCLOSED,
-        E_DUPATTR,
-        E_ELEMNOTCLOSED,
-        E_INVETAG
+        [[nodiscard]] const std::string_view& value() const { return m_value; }
     };
 
-    enum
+    class attribute
     {
-        T_ELEMENT,
-        T_COMMENT,
-        T_PCINSTR,
-    };
-
-    struct error
-    {
-        int         code;
-        const char* source;
-    };
-
-    using attrmap = std::map<const safestringview, const safestringview, std::less<safestringview>>;
-
-    class dom
-    {
-        friend class domparser;
-        friend class doc;
-
-        int              m_type;
-        safestringview   m_tag;
-        safestringview   m_content;
-        attrmap          m_attr;
-        std::vector<dom> m_children;
-
-        FRXML_EXPORT void tostring(std::stringstream& ss, int indent) const;
+        std::string_view m_key;
+        std::string_view m_value;
 
     public:
-        [[nodiscard]]
-        FRXML_EXPORT int type() const;
+        attribute(const std::string_view& key, const std::string_view& value)
+            : m_key(key), m_value(value)
+        {
+        }
 
-        [[nodiscard]]
-        FRXML_EXPORT safestringview tag() const;
-
-        [[nodiscard]]
-        FRXML_EXPORT const attrmap& attr() const;
-
-        [[nodiscard]]
-        FRXML_EXPORT const std::vector<dom>& children() const;
-
-        [[nodiscard]]
-        FRXML_EXPORT safestringview& tag();
-
-        [[nodiscard]]
-        FRXML_EXPORT attrmap& attr();
-
-        [[nodiscard]]
-        FRXML_EXPORT std::vector<dom>& children();
-
-
-        [[nodiscard]]
-        FRXML_EXPORT static dom element(const std::string& tag, attrmap attr = {}, std::vector<dom> children = {});
-
-        [[nodiscard]]
-        FRXML_EXPORT static dom pcinstr(const std::string& target, const std::string& content);
-
-        [[nodiscard]]
-        FRXML_EXPORT static dom comment(const std::string& content);
+        [[nodiscard]] const std::string_view& key() const { return m_key; }
+        [[nodiscard]] const std::string_view& value() const { return m_value; }
     };
+
+    class element
+    {
+        friend class doc;
+
+        std::string_view m_tag;
+        size_t           m_start;
+        size_t           m_size;
+
+    public:
+        explicit element(const std::string_view& tag, size_t start, size_t size)
+            : m_tag(tag), m_start(start), m_size(size)
+        {
+        }
+
+        [[nodiscard]] const std::string_view& tag() const { return m_tag; }
+    };
+
+    class pi
+    {
+        std::string_view m_target;
+        std::string_view m_value;
+
+    public:
+        explicit pi(const std::string_view& target, const std::string_view& value)
+            : m_target(target), m_value(value)
+        {
+        }
+
+        [[nodiscard]] const std::string_view& target() const { return m_target; }
+        [[nodiscard]] const std::string_view& value() const { return m_value; }
+    };
+
+
+    enum error : int8_t
+    {
+        S_OK = 0,
+        I_ETAG,
+        I_EOF,
+
+        E_NO_BEGIN = -128,
+        E_EARLY_EOF,
+        E_INVALID_SEQ,
+        E_NO_END,
+        E_NO_SUCH,
+        E_NO_QUOTE,
+        E_INVALID_ETAG
+    };
+
+#define STD_PARAMS const char* __restrict& start, const char* __restrict end, size_t& size
 
     class doc
     {
-        friend class domparser;
+        std::vector<std::variant<comment, attribute, element, pi>> m_buffer;
+        size_t                                                     m_size;
+        error                                                      m_code;
+        ptrdiff_t                                                  m_error;
 
-        error            m_error;
-        std::vector<dom> m_children;
+        [[nodiscard]] error ParsePI(STD_PARAMS);
+
+        [[nodiscard]] error ParseComment(STD_PARAMS);
+
+        [[nodiscard]] error ParseETag(STD_PARAMS, std::string_view* tag);
+
+        [[nodiscard]] error ParseMisc(STD_PARAMS, std::string_view* tag);
+
+        [[nodiscard]] error ParseMiscVec(STD_PARAMS);
+
+        [[nodiscard]] error ParseElement(STD_PARAMS);
+
+        [[nodiscard]] error ParseElementLike(STD_PARAMS, std::string_view* tag);
 
     public:
-        FRXML_EXPORT doc(std::vector<dom> root);
+        FRXML_EXPORT explicit doc(std::string_view str);
 
-        FRXML_EXPORT doc(std::string_view str);
-
-        [[nodiscard]]
-        FRXML_EXPORT operator std::string() const;
-
-        [[nodiscard]]
         FRXML_EXPORT bool operator!() const;
 
-        [[nodiscard]]
-        FRXML_EXPORT error error() const;
+        [[nodiscard]] FRXML_EXPORT error exception() const;
 
-        [[nodiscard]]
-        FRXML_EXPORT const std::vector<dom>& children() const;
+        [[nodiscard]] FRXML_EXPORT size_t offset() const;
 
-        [[nodiscard]]
-        FRXML_EXPORT std::vector<dom>& children();
+        FRXML_EXPORT decltype(m_buffer)& children();
 
-        [[nodiscard]]
-        FRXML_EXPORT const dom& root() const;
-
-        [[nodiscard]]
-        FRXML_EXPORT dom& root();
+        [[nodiscard]] FRXML_EXPORT const decltype(m_buffer)& children() const;
     };
 }
 
