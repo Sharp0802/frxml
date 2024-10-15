@@ -11,7 +11,7 @@ FRXML is DOM-based light-weight & robust XML parser, written in C++17.
 ## Limitation
 
 - No `<! ... >` things such as `<!DOCTYPE ...` or `<!ENTITY ...` etc...
-- No entity(`&lt;`, `&#x20`) encoder/decoder
+- No entity(`&lt;`, `&#x20`) encoder/decoder (to achieve zero-copy)
 
 Currently, FRXML doesn't support XML 1.0 specification yet.
 Below is implemented XML format with EBNF format:
