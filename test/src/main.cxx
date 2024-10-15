@@ -4,105 +4,183 @@
 #include <frxml.h>
 #include <libxml2/libxml/parser.h>
 #include <pugixml.hpp>
-#include <ranges>
-#include <algorithm>
+#include <benchmark/benchmark.h>
+#include <tinyxml2.h>
+#include <sstream>
+#include <rapidxml/rapidxml.hpp>
 
-timespec diff(timespec start, timespec end)
+#include "randomxml.h"
+
+class CustomMemoryManager : public benchmark::MemoryManager
 {
-    timespec temp{};
-    if (end.tv_nsec - start.tv_nsec < 0)
+public:
+    size_t m_allocated  = 0;
+    size_t m_nAllocated = 0;
+
+    void Start() BENCHMARK_OVERRIDE
     {
-        temp.tv_sec  = end.tv_sec - start.tv_sec - 1;
-        temp.tv_nsec = 1000000000 + end.tv_nsec - start.tv_nsec;
+        m_allocated  = 0;
+        m_nAllocated = 0;
     }
-    else
+
+    void Stop(Result& result) BENCHMARK_OVERRIDE
     {
-        temp.tv_sec  = end.tv_sec - start.tv_sec;
-        temp.tv_nsec = end.tv_nsec - start.tv_nsec;
+        result.num_allocs     = static_cast<int64_t>(m_nAllocated);
+        result.max_bytes_used = static_cast<int64_t>(m_allocated);
     }
-    return temp;
+};
+
+static CustomMemoryManager g_memoryManager;
+
+extern "C" void* __real_malloc(size_t size);
+
+extern "C" void __real_free(void* ptr);
+
+extern "C" void* __wrap_malloc(size_t size)
+{
+    g_memoryManager.m_allocated += size;
+    g_memoryManager.m_nAllocated++;
+
+    // ReSharper disable once CppDFAMemoryLeak
+    if (auto p = __real_malloc(size + sizeof size))
+    {
+        memcpy(p, &size, sizeof(size));
+        return static_cast<size_t*>(p) + 1;
+    }
+
+    throw std::bad_alloc();
 }
 
-double todouble(timespec ts)
+extern "C" void __wrap_free(void* p)
 {
-    ts.tv_nsec /= 100;
-    return static_cast<double>(ts.tv_sec) + static_cast<double>(ts.tv_nsec) / 10000000.0;
+    const auto p8 = static_cast<size_t*>(p) - 1;
+    __real_free(p8);
 }
 
-double benchmark(void (*fn)())
+void* operator new(std::size_t size)
 {
-    timespec start{}, end{};
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
-
-    for (int i = 0; i < 1000; ++i) fn();
-
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end);
-
-    return todouble(diff(start, end));
+    return __wrap_malloc(size);
 }
 
-int main()
+void operator delete(void* p) noexcept
 {
-    static int     code = 0;
-    static char    buf[1048576];
-    static ssize_t size;
+    __wrap_free(p);
+}
 
-    std::cout << "Size (KB),\tDepth,\tFRXML (ms),\tPugiXML (ms),\tLibXml2 (DOM, ms)" << std::endl;
+std::map<size_t, std::string> g_vXML;
 
-    for (std::string file: {
-             "1, 3",
-             "10, 3",
-             "50, 3",
-             "1, 10",
-             "10, 10",
-             "50, 10"
-         })
+static void PrepareXMLs()
+{
+    static bool first = true;
+    if (!first) return;
+    first = false;
+
+    for (auto i = 10; i <= 5000; i += 10)
     {
-        const auto fd = open((file + ".xml").c_str(), O_RDONLY);
-        if (fd < 0)
-        {
-            perror("open");
-            continue;
-        }
+        pugi::xml_document doc;
+        pugi::xml_node     root = doc.append_child("root");
 
-        size                = read(fd, buf, sizeof buf);
-        buf[sizeof buf - 1] = 0;
+        auto copy = i;
 
-        auto frxml = benchmark([]
-        {
-            if (const frxml::doc doc{ std::string_view(buf, size) }; !doc)
-                code = doc.error().code;
-        });
+        GenerateXML(root, copy);
 
-        double libxml;
-        if (size > 10240)
-        {
-            libxml = -1;
-        }
-        else
-        {
-            libxml = benchmark([]
-            {
-                auto doc = xmlReadMemory(buf, size, nullptr, nullptr, 0);
-                xmlFreeDoc(doc);
-                xmlCleanupParser();
-            });
-        }
+        std::stringstream ss;
+        doc.print(ss);
 
-        auto pugixml = benchmark([]
-        {
-            pugi::xml_document doc;
-            [[maybe_unused]]
-                pugi::xml_parse_result result = doc.load_string(buf, pugi::parse_default | pugi::encoding_utf8);
-        });
+        auto str = ss.str();
 
-        std::cout << file << ",\t" << frxml << ",\t" << pugixml << ",\t" << libxml << std::endl;
-
-        if (code != 0)
-            std::cerr << "Exited with code: " << code << std::endl;
-
-        close(fd);
+        g_vXML.emplace(str.size(), str);
     }
+}
+
+static void BenchmarkArguments(benchmark::internal::Benchmark* bm)
+{
+    PrepareXMLs();
+    for (const auto& [size, _]: g_vXML)
+        bm->Args({ static_cast<int64_t>(size) });
+}
+
+static std::string& PrepareBenchmark(benchmark::State& state)
+{
+    return g_vXML[state.range(0)];
+}
+
+static void BM_frxml(benchmark::State& state)
+{
+    auto str = PrepareBenchmark(state);
+
+    for (auto _: state)
+    {
+        if (frxml::doc doc{ std::string_view(str.data(), str.size()) }; !doc)
+            state.SkipWithError(std::to_string(doc.exception()));
+    }
+}
+
+static void BM_rapidxml(benchmark::State& state)
+{
+    auto str = PrepareBenchmark(state);
+
+    for (auto _: state)
+    {
+        // coping is required: rapidxml changes source string
+        std::string copy = str;
+
+        try
+        {
+            rapidxml::xml_document<> doc;
+            doc.parse<rapidxml::parse_full>(copy.data());
+        }
+        catch (const std::exception& e)
+        {
+            state.SkipWithError(str);
+        }
+    }
+}
+
+static void BM_pugixml(benchmark::State& state)
+{
+    auto str = PrepareBenchmark(state);
+
+    for (auto _: state)
+    {
+        pugi::xml_document doc;
+        if (auto result = doc.load_string(str.data(), pugi::parse_full | pugi::encoding_utf8); !result)
+            state.SkipWithError(result.description());
+    }
+}
+
+static void BM_tinyxml2(benchmark::State& state)
+{
+    auto str = PrepareBenchmark(state);
+
+    for (auto _: state)
+    {
+        tinyxml2::XMLDocument a;
+        a.Parse(str.data(), str.size());
+    }
+}
+
+#define ITER 3
+
+BENCHMARK(BM_rapidxml)->Apply(BenchmarkArguments)->Iterations(ITER);
+BENCHMARK(BM_frxml)->Apply(BenchmarkArguments)->Iterations(ITER);
+BENCHMARK(BM_pugixml)->Apply(BenchmarkArguments)->Iterations(ITER);
+BENCHMARK(BM_tinyxml2)->Apply(BenchmarkArguments)->Iterations(ITER);
+
+int main(int argc, char** argv)
+{
+    srand(time(nullptr));
+
+    pugi::set_memory_management_functions(__wrap_malloc, __wrap_free);
+
+    benchmark::RegisterMemoryManager(&g_memoryManager);
+    benchmark::Initialize(&argc, argv);
+    if (benchmark::ReportUnrecognizedArguments(argc, argv))
+        return 1;
+
+    benchmark::RunSpecifiedBenchmarks();
+    benchmark::RegisterMemoryManager(nullptr);
+    benchmark::Shutdown();
 
     return 0;
 }
