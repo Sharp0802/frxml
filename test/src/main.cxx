@@ -111,7 +111,10 @@ static void BM_frxml(benchmark::State& state)
 
     for (auto _: state)
     {
-        if (frxml::doc doc{ std::string_view(str.data(), str.size()) }; !doc)
+        frxml::doc doc{ std::string_view(str.data(), str.size()) };
+        if (!doc)
+            state.SkipWithError(std::to_string(doc.exception()));
+        if (!doc.validate())
             state.SkipWithError(std::to_string(doc.exception()));
     }
 }

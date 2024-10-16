@@ -4,6 +4,44 @@
 #define CHECK_EOF { if (start >= end) return I_EOF; }
 #define VIEW(begin, end) std::string_view{ begin, static_cast<size_t>(end - begin) }
 
+char32_t UTF8(const char* str, size_t size, size_t& length)
+{
+    const unsigned char byte = str[0];
+
+    if (byte < 0x80)
+        length = 1;
+    else if (byte >> 5 == 0x6)
+        length = 2;
+    else if (byte >> 4 == 0xE)
+        length = 3;
+    else if (byte >> 3 == 0x1E)
+        length = 4;
+    else
+        length = 0;
+
+    if (!length || length > size)
+        return 0;
+
+    char32_t codepoint = 0;
+    switch (length)
+    {
+        case 1:
+            codepoint = byte;
+            break;
+        case 2:
+            codepoint = (str[0] & 0x1F) << 6 | str[1] & 0x3F;
+            break;
+        case 3:
+            codepoint = (str[0] & 0x0F) << 12 | (str[1] & 0x3F) << 6 | str[2] & 0x3F;
+            break;
+        case 4:
+            codepoint = (str[0] & 0x07) << 18 | (str[1] & 0x3F) << 12 | (str[2] & 0x3F) << 6 | str[3] & 0x3F;
+            break;
+    }
+
+    return codepoint;
+}
+
 inline bool IsSpace(char ch)
 {
     return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n';
@@ -20,14 +58,18 @@ inline frxml::error frxml::doc::ParsePI(STD_PARAMS)
 {
     // get target
     auto begin = start;
-    for (; start != end - 1 && !IsSpace(*start) && (start[0] != '?' || start[1] != '>'); ++start) {}
+    for (; start != end - 1 && !IsSpace(*start) && (start[0] != '?' || start[1] != '>'); ++start)
+    {
+    }
     ENSURE_BOUND;
 
     const auto target = VIEW(begin, start);
 
     // find '?>'
     begin = start;
-    for (; start != end - 1 && (start[0] != '?' || start[1] != '>'); ++start) {}
+    for (; start != end - 1 && (start[0] != '?' || start[1] != '>'); ++start)
+    {
+    }
     ENSURE_BOUND;
 
     const auto value = VIEW(begin, start);
@@ -44,7 +86,9 @@ inline frxml::error frxml::doc::ParseComment(STD_PARAMS)
 {
     // get content
     auto begin = start;
-    for (; start != end - 1 && (start[0] != '-' || start[1] != '-'); ++start) {}
+    for (; start != end - 1 && (start[0] != '-' || start[1] != '-'); ++start)
+    {
+    }
     ENSURE_BOUND;
 
     const auto content = VIEW(begin, start);
@@ -68,7 +112,9 @@ inline frxml::error frxml::doc::ParseComment(STD_PARAMS)
 inline frxml::error frxml::doc::ParseETag(STD_PARAMS, std::string_view* tag)
 {
     const auto begin = start;
-    for (; start != end && *start != '>' && !IsSpace(*start); ++start) {}
+    for (; start != end && *start != '>' && !IsSpace(*start); ++start)
+    {
+    }
     ENSURE_BOUND;
 
     if (const auto etag = VIEW(begin, start); !tag || *tag != etag)
@@ -118,7 +164,9 @@ inline frxml::error frxml::doc::ParseMisc(STD_PARAMS, std::string_view* tag)
 inline frxml::error frxml::doc::ParseMiscVec(STD_PARAMS)
 {
     error err;
-    while ((err = ParseMisc(start, end, size, nullptr)) == S_OK) {}
+    while ((err = ParseMisc(start, end, size, nullptr)) == S_OK)
+    {
+    }
     if (err == E_NO_SUCH)
         err = S_OK;
     return err;
@@ -159,7 +207,9 @@ inline frxml::error frxml::doc::ParseElementLike(STD_PARAMS, std::string_view* t
 inline frxml::error frxml::doc::ParseElement(STD_PARAMS)
 {
     auto begin = start;
-    for (; start != end && !IsSpace(*start) && *start != '>' && *start != '/'; ++start) {}
+    for (; start != end && !IsSpace(*start) && *start != '>' && *start != '/'; ++start)
+    {
+    }
     ENSURE_BOUND;
 
     auto tag = VIEW(begin, start);
@@ -194,7 +244,9 @@ inline frxml::error frxml::doc::ParseElement(STD_PARAMS)
 
         // find '='
         begin = start;
-        for (; start != end && *start != '='; ++start) {}
+        for (; start != end && *start != '='; ++start)
+        {
+        }
         ENSURE_BOUND;
 
         auto key = VIEW(begin, start);
@@ -210,7 +262,9 @@ inline frxml::error frxml::doc::ParseElement(STD_PARAMS)
 
         // find quote
         begin = start;
-        for (; start != end && *start != quote; ++start) {}
+        for (; start != end && *start != quote; ++start)
+        {
+        }
         ENSURE_BOUND;
 
         auto value = VIEW(begin, start);
@@ -236,7 +290,7 @@ inline frxml::error frxml::doc::ParseElement(STD_PARAMS)
     return err == I_ETAG ? S_OK : err;
 }
 
-frxml::doc::doc(std::string_view str)
+frxml::doc::doc(std::string_view str) : m_size(0)
 {
     auto begin = str.begin();
 
@@ -252,6 +306,87 @@ frxml::doc::doc(std::string_view str)
 
 ERROR:
     m_error = begin - str.begin();
+}
+
+bool IsNameStartChar(char32_t ch)
+{
+    return
+        ch == ':' ||
+        ch == '_' ||
+        ('A' <= ch && ch <= 'Z') ||
+        ('a' <= ch && ch <= 'z') ||
+        (0x00C0 <= ch && ch <= 0x00D6) ||
+        (0x00D8 <= ch && ch <= 0x00F6) ||
+        (0x00F8 <= ch && ch <= 0x02FF) ||
+        (0x0370 <= ch && ch <= 0x037D) ||
+        (0x037F <= ch && ch <= 0x1FFF) ||
+        (0x200C <= ch && ch <= 0x200D) ||
+        (0x2070 <= ch && ch <= 0x218F) ||
+        (0x2C00 <= ch && ch <= 0x2FEF) ||
+        (0x3001 <= ch && ch <= 0xD7FF);
+}
+
+bool IsNameChar(char32_t ch)
+{
+    return
+        IsNameStartChar(ch) ||
+        ch == '-' ||
+        ch == '.' ||
+        ('0' <= ch && ch <= '9') ||
+        ch == 0xB7 ||
+        (0x0300 <= ch && ch <= 0x036F) ||
+        (0x203F <= ch && ch <= 0x2040);
+}
+
+bool ValidateName(std::string_view view)
+{
+    size_t length;
+    for (size_t i = 0; i < view.length(); i += length)
+    {
+        auto ch = UTF8(view.data() + i, view.length() - i, length);
+
+        if (i == 0 && !IsNameStartChar(ch))
+            return false;
+        if (!IsNameChar(ch))
+            return false;
+        if (length <= 0)
+            return false;
+    }
+
+    return true;
+}
+
+bool frxml::doc::validate()
+{
+    for (auto i = 0; i < m_buffer.size(); i++)
+    {
+        auto& nodeV = m_buffer[i];
+
+        std::string_view name;
+        switch (nodeV.index())
+        {
+            case 1:
+                name = std::get<attribute>(nodeV).key();
+                break;
+            case 2:
+                name = std::get<element>(nodeV).tag();
+                break;
+            case 3:
+                name = std::get<pi>(nodeV).target();
+                break;
+            default:
+                continue;
+        }
+
+        if (!ValidateName(name))
+        {
+            m_error = i;
+            m_code  = E_INVALID_SEQUENCE;
+            return false;
+        }
+    }
+
+    return true;
 }
 
 bool frxml::doc::operator!() const

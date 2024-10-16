@@ -82,7 +82,8 @@ namespace frxml
         E_NO_END,
         E_NO_SUCH,
         E_NO_QUOTE,
-        E_INVALID_ETAG
+        E_INVALID_ETAG,
+        E_INVALID_SEQUENCE
     };
 
 #define STD_PARAMS const char* __restrict& start, const char* __restrict end, size_t& size
@@ -109,16 +110,45 @@ namespace frxml
         [[nodiscard]] error ParseElementLike(STD_PARAMS, std::string_view* tag);
 
     public:
+        /**
+         * @brief Parses xml string into DOM
+         * @param str A string-view of xml string
+         */
         FRXML_EXPORT explicit doc(std::string_view str);
 
+        /**
+         * @brief Validates this document
+         * @return True if the document is valid
+         */
+        [[nodiscard]] FRXML_EXPORT bool validate();
+
+        /**
+         * @brief Determines if this document can be used
+         * @return True if it cannot be used, otherwise false
+         */
         FRXML_EXPORT bool operator!() const;
 
+        /**
+         * @brief Gets error code
+         * @return 0 or greater than 0 when job completed successfully, otherwise less than 0
+         */
         [[nodiscard]] FRXML_EXPORT error exception() const;
 
+        /**
+         * Gets offset of source that occurs error during job
+         * @return Offset of source (source string for parsing, source node for validation)
+         */
         [[nodiscard]] FRXML_EXPORT size_t offset() const;
 
+        /**
+         * @brief Gets all descendants of this document
+         * @return Descendants of this document
+         */
         FRXML_EXPORT decltype(m_buffer)& children();
 
+        /**
+         * @copydoc children
+         */
         [[nodiscard]] FRXML_EXPORT const decltype(m_buffer)& children() const;
     };
 }
