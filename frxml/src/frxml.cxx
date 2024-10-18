@@ -54,7 +54,7 @@ inline void SkipSpace(const char* __restrict& start, const char* __restrict end)
     }
 }
 
-inline frxml::error frxml::doc::ParsePI(STD_PARAMS)
+inline frxml::error frxml::doc::ParsePI(FRXML_STD_PARAMS)
 {
     // get target
     auto begin = start;
@@ -82,7 +82,7 @@ inline frxml::error frxml::doc::ParsePI(STD_PARAMS)
     return S_OK;
 }
 
-inline frxml::error frxml::doc::ParseComment(STD_PARAMS)
+inline frxml::error frxml::doc::ParseComment(FRXML_STD_PARAMS)
 {
     // get content
     auto begin = start;
@@ -109,7 +109,7 @@ inline frxml::error frxml::doc::ParseComment(STD_PARAMS)
     return S_OK;
 }
 
-inline frxml::error frxml::doc::ParseETag(STD_PARAMS, std::string_view* tag)
+inline frxml::error frxml::doc::ParseETag(FRXML_STD_PARAMS, std::string_view* tag)
 {
     const auto begin = start;
     for (; start != end && *start != '>' && !IsSpace(*start); ++start)
@@ -128,7 +128,7 @@ inline frxml::error frxml::doc::ParseETag(STD_PARAMS, std::string_view* tag)
     return I_ETAG;
 }
 
-inline frxml::error frxml::doc::ParseMisc(STD_PARAMS, std::string_view* tag)
+inline frxml::error frxml::doc::ParseMisc(FRXML_STD_PARAMS, std::string_view* tag)
 {
     SkipSpace(start, end);
     CHECK_EOF;
@@ -161,7 +161,7 @@ inline frxml::error frxml::doc::ParseMisc(STD_PARAMS, std::string_view* tag)
     }
 }
 
-inline frxml::error frxml::doc::ParseMiscVec(STD_PARAMS)
+inline frxml::error frxml::doc::ParseMiscVec(FRXML_STD_PARAMS)
 {
     error err;
     while ((err = ParseMisc(start, end, size, nullptr)) == S_OK)
@@ -172,7 +172,7 @@ inline frxml::error frxml::doc::ParseMiscVec(STD_PARAMS)
     return err;
 }
 
-inline frxml::error frxml::doc::ParseElementLike(STD_PARAMS, std::string_view* tag)
+inline frxml::error frxml::doc::ParseElementLike(FRXML_STD_PARAMS, std::string_view* tag)
 {
     SkipSpace(start, end);
     CHECK_EOF;
@@ -204,7 +204,7 @@ inline frxml::error frxml::doc::ParseElementLike(STD_PARAMS, std::string_view* t
     }
 }
 
-inline frxml::error frxml::doc::ParseElement(STD_PARAMS)
+inline frxml::error frxml::doc::ParseElement(FRXML_STD_PARAMS)
 {
     auto begin = start;
     for (; start != end && !IsSpace(*start) && *start != '>' && *start != '/'; ++start)
@@ -214,8 +214,8 @@ inline frxml::error frxml::doc::ParseElement(STD_PARAMS)
 
     auto tag = VIEW(begin, start);
 
-    auto local = m_buffer.size();
-    m_buffer.emplace_back(std::in_place_type_t<element>(), tag, m_buffer.size() + 1, 0);
+    auto local = m_buffer.all().size();
+    m_buffer.emplace_back(std::in_place_type_t<element>(), tag, 0);
 
     size_t localSize = 0;
 
@@ -285,7 +285,7 @@ inline frxml::error frxml::doc::ParseElement(STD_PARAMS)
     {
     }
 
-    std::get<element>(m_buffer[local]).m_size += localSize;
+    std::get<element>(m_buffer.at_raw(local)).m_size += localSize;
 
     return err == I_ETAG ? S_OK : err;
 }
@@ -358,9 +358,9 @@ bool ValidateName(std::string_view view)
 
 bool frxml::doc::validate()
 {
-    for (auto i = 0; i < m_buffer.size(); i++)
+    for (auto i = 0; i < m_buffer.all().size(); i++)
     {
-        auto& nodeV = m_buffer[i];
+        auto& nodeV = m_buffer.at_raw(i);
 
         std::string_view name;
         switch (nodeV.index())
@@ -413,14 +413,3 @@ const decltype(frxml::doc::m_buffer)& frxml::doc::children() const
 {
     return m_buffer;
 }
-
-/*
-frxml::dom_vector& frxml::doc::children()
-{
-    return m_buffer[0];
-}
-
-const frxml::dom_vector& frxml::doc::children() const
-{
-    return m_buffer[0];
-}*/
