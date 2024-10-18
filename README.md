@@ -61,27 +61,7 @@ int main()
     frxml::doc doc{ xml };
     if (!doc)
     {
-        auto error = doc.error();
-        std::cout << std::string_view(error.source - 1, 3) << ',' << error.code << '\n';
+        std::cout << std::to_string(error.exception()) << '\n';
     }
-
-    std::cout << static_cast<std::string>(doc);
 }
-```
-
-- Result
-
-```
-<?xml version="1.0" encoding="UTF-8"?>
-<?ユニコードは 好きですか??>
-<!-- HELLO! -->
-<xml0>
-	<유니코드 attr="안녕하세요" attr0="1">
-		<xml3/>
-		<!-- HELLO! -->
-	</유니코드>
-	<?ユニコードは 好きですか??>
-	<xml2 attr="c"/>
-</xml0>
-<!-- HELLO! -->
 ```
