@@ -85,34 +85,3 @@ int main()
 </xml0>
 <!-- HELLO! -->
 ```
-
-### Manipulation
-
-```c++
-#include <iostream>
-#include <frxml.h>
-
-int main()
-{
-    auto root = frxml::dom::element("xml0", {
-        { "xmlns", "test-xmlns" }
-    }, {
-        frxml::dom::comment(" Hello, FRXML! "),
-        frxml::dom::pcinstr("xml1", "test pcinstr"),
-        frxml::dom::element("test-element")
-    });
-
-    frxml::doc doc{ { root } };
-    std::cout << static_cast<std::string>(doc);
-}
-```
-
-- Result
-
-```
-<xml0 xmlns="test-xmlns">
-	<!-- Hello, FRXML! -->
-	<?xml1 test pcinstr?>
-	<test-element/>
-</xml0>
-```
