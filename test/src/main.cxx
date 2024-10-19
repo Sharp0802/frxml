@@ -75,14 +75,14 @@ static void PrepareXMLs()
     if (!first) return;
     first = false;
 
-    for (auto i = 10; i <= 5000; i += 10)
+    for (auto i = 50; i <= 1000; i += 10)
     {
         pugi::xml_document doc;
         pugi::xml_node     root = doc.append_child("root");
 
         auto copy = i;
 
-        GenerateXML(root, copy);
+        GenerateXML(root, copy, 300);
 
         std::stringstream ss;
         doc.print(ss);

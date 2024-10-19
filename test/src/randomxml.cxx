@@ -11,8 +11,9 @@ std::string RandomString(int length)
     return result;
 }
 
-void GenerateXML(pugi::xml_node& parent, int& node_count)
+void GenerateXML(pugi::xml_node& parent, int& node_count, int depth)
 {
+    if (depth <= 0) return;
     if (node_count <= 0) return;
 
     // Create a new node with a random name
@@ -27,9 +28,7 @@ void GenerateXML(pugi::xml_node& parent, int& node_count)
     // Decrease the remaining node count
     node_count--;
 
-    // Recursively add child nodes
-    int num_children = rand() % 4; // Random number of child nodes (0-3)
-    for (int i = 0; i < num_children && node_count > 0; ++i) {
-        GenerateXML(new_node, node_count);
-    }
+    for (int i = 0; depth > 1 && node_count > 0; ++i)
+        if (rand() % 2)
+            GenerateXML(new_node, node_count, depth - 1);
 }
