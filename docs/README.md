@@ -2,6 +2,10 @@
 
 FRXML is DOM-based light-weight & robust XML parser, written in C++17.
 
+## Benchmark
+
+![benchmark](Figure_1.png)
+
 ## Features
 
 - zero-copy/single-pass parsing
