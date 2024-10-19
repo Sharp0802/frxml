@@ -34,27 +34,12 @@ static CustomMemoryManager g_memoryManager;
 
 extern "C" void* __real_malloc(size_t size);
 
-extern "C" void __real_free(void* ptr);
-
 extern "C" void* __wrap_malloc(size_t size)
 {
     g_memoryManager.m_allocated += size;
     g_memoryManager.m_nAllocated++;
 
-    // ReSharper disable once CppDFAMemoryLeak
-    if (auto p = __real_malloc(size + sizeof size))
-    {
-        memcpy(p, &size, sizeof(size));
-        return static_cast<size_t*>(p) + 1;
-    }
-
-    throw std::bad_alloc();
-}
-
-extern "C" void __wrap_free(void* p)
-{
-    const auto p8 = static_cast<size_t*>(p) - 1;
-    __real_free(p8);
+    return __real_malloc(size);
 }
 
 void* operator new(std::size_t size)
@@ -64,7 +49,7 @@ void* operator new(std::size_t size)
 
 void operator delete(void* p) noexcept
 {
-    __wrap_free(p);
+    free(p);
 }
 
 std::map<size_t, std::string> g_vXML;
@@ -119,6 +104,20 @@ static void BM_frxml(benchmark::State& state)
     }
 }
 
+static void BM_libxml2(benchmark::State& state)
+{
+    auto str = PrepareBenchmark(state);
+
+    for (auto _: state)
+    {
+        auto doc = xmlReadMemory(str.data(), str.size(), nullptr, nullptr, XML_PARSE_HUGE);
+        if (!doc)
+            state.SkipWithError("Failed to parsing");
+        else
+            xmlFreeDoc(doc);
+    }
+}
+
 static void BM_rapidxml(benchmark::State& state)
 {
     auto str = PrepareBenchmark(state);
@@ -160,6 +159,8 @@ static void BM_tinyxml2(benchmark::State& state)
     {
         tinyxml2::XMLDocument a;
         a.Parse(str.data(), str.size());
+        if (a.Error())
+            state.SkipWithError(a.ErrorStr());
     }
 }
 
@@ -169,12 +170,14 @@ BENCHMARK(BM_rapidxml)->Apply(BenchmarkArguments)->Iterations(ITER);
 BENCHMARK(BM_frxml)->Apply(BenchmarkArguments)->Iterations(ITER);
 BENCHMARK(BM_pugixml)->Apply(BenchmarkArguments)->Iterations(ITER);
 BENCHMARK(BM_tinyxml2)->Apply(BenchmarkArguments)->Iterations(ITER);
+BENCHMARK(BM_libxml2)->Apply(BenchmarkArguments)->Iterations(ITER);
 
 int main(int argc, char** argv)
 {
     srand(time(nullptr));
 
-    pugi::set_memory_management_functions(__wrap_malloc, __wrap_free);
+    xmlMemSetup(free, __wrap_malloc, realloc, strdup);
+    pugi::set_memory_management_functions(__wrap_malloc, free);
 
     benchmark::RegisterMemoryManager(&g_memoryManager);
     benchmark::Initialize(&argc, argv);
