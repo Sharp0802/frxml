@@ -1,10 +1,14 @@
 # FRXML : Fast/Robust XML parser
 
-FRXML is DOM-based light-weight & robust XML parser, written in C++17.
+FRXML is DOM-based light-weight & robust XML parser, written in C++17 - with a goal
+that is to archive `O(n)` level of memory occupancy,
+regardless of how deep the depth of the xml document is
 
 ## Benchmark
 
 ![benchmark](Figure_1.png)
+
+* lower is better
 
 ## Features
 
