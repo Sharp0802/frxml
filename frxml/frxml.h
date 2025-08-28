@@ -1,307 +1,184 @@
 #ifndef FRXML_LIBRARY_H
 #define FRXML_LIBRARY_H
 
+#include <cstdint>
 #include <string>
-#include <memory>
-#include <variant>
 #include <vector>
 
 #define FRXML_EXPORT __attribute__((visibility("default")))
 
-namespace frxml
-{
-    class comment
-    {
-        std::string_view m_value;
+namespace frxml {
+  enum class node_type {
+    NONE           = 0,
+    ELEMENT        = 1,
+    ATTR           = 2,
+    COMMENT        = ELEMENT | 4,
+    PI             = ELEMENT | 8,
+    END_OF_ELEMENT = 16
+  };
 
-    public:
-        explicit comment(const std::string_view& value) : m_value(value)
-        {
-        }
+  template<typename T>
+  class node_iterator {
+    const T *_base;
 
-        [[nodiscard]] const std::string_view& value() const { return m_value; }
-    };
+  public:
+    explicit node_iterator(const T *base) : _base(base) {
+    }
 
-    class attribute
-    {
-        std::string_view m_key;
-        std::string_view m_value;
+    using difference_type = std::ptrdiff_t;
+    using value_type = T;
+    using pointer = const T*;
+    using reference = const T&;
+    using iterator_category = std::forward_iterator_tag;
 
-    public:
-        attribute(const std::string_view& key, const std::string_view& value)
-            : m_key(key), m_value(value)
-        {
-        }
+    reference operator*() const { return *_base; }
+    pointer operator->() const { return _base; }
 
-        [[nodiscard]] const std::string_view& key() const { return m_key; }
-        [[nodiscard]] const std::string_view& value() const { return m_value; }
-    };
+    node_iterator &operator++() {
+      ++_base;
+      if (~_base->_type & T::type) {
+        _base = nullptr;
+      }
+      return *this;
+    }
 
-    class element
-    {
-        friend class doc;
+    [[nodiscard]]
+    node_iterator operator++(int) {
+      node_iterator copy = *this;
+      ++*this;
+      return copy;
+    }
 
-        std::string_view m_tag;
-        size_t           m_size;
+    bool operator==(const node_iterator &rhs) const { return _base == rhs._base; }
+    bool operator!=(const node_iterator &rhs) const { return !(*this == rhs); }
 
-    public:
-        explicit element(const std::string_view& tag, size_t size)
-            : m_tag(tag), m_size(size)
-        {
-        }
+    [[nodiscard]]
+    static constexpr node_iterator end() {
+      return node_iterator(nullptr);
+    }
+  };
 
-        [[nodiscard]] const std::string_view& tag() const { return m_tag; }
-        [[nodiscard]] size_t                  size() const { return m_size; }
-    };
+  /**
+   * A struct for attribute node.
+   */
+  struct attr {
+    static constexpr auto TYPE = node_type::ATTR;
 
-    class pi
-    {
-        std::string_view m_target;
-        std::string_view m_value;
+    node_type type = TYPE;
+    std::string_view name;
+    std::string_view value;
+  };
 
-    public:
-        explicit pi(const std::string_view& target, const std::string_view& value)
-            : m_target(target), m_value(value)
-        {
-        }
-
-        [[nodiscard]] const std::string_view& target() const { return m_target; }
-        [[nodiscard]] const std::string_view& value() const { return m_value; }
-    };
-
-
-    enum error : int8_t
-    {
-        S_OK = 0,
-        I_ETAG,
-        I_EOF,
-
-        E_NO_BEGIN = -128,
-        E_EARLY_EOF,
-        E_INVALID_SEQ,
-        E_NO_END,
-        E_NO_SUCH,
-        E_NO_QUOTE,
-        E_INVALID_ETAG,
-        E_INVALID_SEQUENCE
-    };
+  /**
+   * A struct for element node.
+   */
+  struct element {
+    static constexpr auto TYPE = node_type::ELEMENT;
 
     /**
-     * @brief Sibling view of DOM
+     * Type of this node.
+     *
+     * Can be `ELEMENT`, `COMMENT` or `PI`.
+     *
+     * Depending on this field,
+     * Object can safely cast into corresponded type (`comment` and `pi`).
      */
-    class node_view
-    {
-    public:
-        class const_iterator
-        {
-        public:
-            using value_type        = const std::variant<comment, attribute, element, pi>;
-            using iterator_category = std::forward_iterator_tag;
-            using reference         = const value_type&;
-            using pointer           = const value_type*;
-
-        private:
-            pointer m_ptr;
-
-        public:
-            explicit const_iterator(const std::variant<comment, attribute, element, pi>* p) : m_ptr(p)
-            {
-            }
-
-            reference operator*() const { return *m_ptr; }
-            pointer   operator->() const { return m_ptr; }
-
-            const_iterator& operator++()
-            {
-                if (const auto elem = std::get_if<element>(m_ptr))
-                    m_ptr += elem->size();
-                m_ptr++;
-                return *this;
-            }
-
-            const_iterator operator++(int)
-            {
-                const const_iterator tmp = *this;
-                ++*this;
-                return tmp;
-            }
-
-            friend bool operator==(const const_iterator& a, const const_iterator& b) { return a.m_ptr == b.m_ptr; };
-            friend bool operator!=(const const_iterator& a, const const_iterator& b) { return a.m_ptr != b.m_ptr; };
-        };
-
-    private:
-        const std::variant<comment, attribute, element, pi>* m_node;
-        const const_iterator                                 m_end;
-
-        static const_iterator GetEnd(const std::variant<comment, attribute, element, pi>* node)
-        {
-            if (node->index() != 2)
-                return const_iterator{ node + 1 };
-            node++;
-
-            for (auto i = 0; i < std::get<element>(*node).size(); i++)
-            {
-                if (const auto p = std::get_if<element>(node))
-                    node += p->size();
-                node++;
-            }
-            return const_iterator{ node };
-        }
-
-    public:
-        explicit node_view(const std::variant<comment, attribute, element, pi>* node)
-            : m_node(node), m_end(GetEnd(node))
-        {
-        }
-
-        [[nodiscard]] const_iterator begin() const { return const_iterator{ &m_node[1] }; }
-        [[nodiscard]] const_iterator end() const { return m_end; }
-        [[nodiscard]] const_iterator cbegin() const { return begin(); }
-        [[nodiscard]] const_iterator cend() const { return end(); }
-    };
+    node_type type = TYPE;
 
     /**
-     * @brief Descendants view of DOM
+     * Tag of this node.
      */
-    class node_descendants_view
-    {
-    public:
-        using const_iterator = const std::variant<comment, attribute, element, pi>*;
+    std::string_view tag;
 
-    private:
-        const std::variant<comment, attribute, element, pi>* m_node;
-        const const_iterator                                 m_end;
+    /**
+     * Gets children of this element.
+     *
+     * It's undefined behaviour that
+     * call this method for `comment` or `pi` object.
+     * (See `type` field)
+     *
+     * @return Iterator for children of this element
+     */
+    [[nodiscard]]
+    FRXML_EXPORT node_iterator<element> children() const;
 
-    public:
-        explicit node_descendants_view(const std::variant<comment, attribute, element, pi>* node)
-            : m_node(node), m_end(node_view{ node }.end().operator->())
-        {
-        }
+    /**
+     * Gets attributes of this element.
+     *
+     * It's undefined behaviour that
+     * call this method for `comment` or `pi` object.
+     * (See `type` field)
+     *
+     * @return Iterator for attributes of this element
+     */
+    [[nodiscard]]
+    FRXML_EXPORT node_iterator<attr> attrs() const;
+  };
 
-        [[nodiscard]] const_iterator begin() const { return const_iterator{ &m_node[1] }; }
-        [[nodiscard]] const_iterator end() const { return m_end; }
-        [[nodiscard]] const_iterator cbegin() const { return begin(); }
-        [[nodiscard]] const_iterator cend() const { return end(); }
-    };
+  /**
+   * A struct for comment node.
+   */
+  struct comment {
+    static constexpr auto TYPE = node_type::COMMENT;
 
-    class node_vector
-    {
-        friend class doc;
+    /**
+     * Type of this node.
+     *
+     * Must be `COMMENT`.
+     */
+    node_type type = TYPE;
 
-        std::vector<std::variant<comment, attribute, element, pi>> m_data;
+    /**
+     * Content of comment.
+     */
+    std::string_view content;
+  };
 
-        /**
-         * @brief Emplace new item to inner vector
-         * @tparam Args Non-argument pack parameter for forwarding arguments to inner vector
-         * @param args Arguments that are forwarded to inner vector
-         * @return Item constructed with given arguments
-         */
-        template<typename... Args>
-        decltype(m_data)::reference emplace_back(Args&&... args)
-        {
-            return m_data.emplace_back(std::forward<Args>(args)...);
-        }
+  /**
+   * A struct for processing instruction node.
+   */
+  struct pi {
+    static constexpr auto TYPE = node_type::PI;
 
-        /**
-         * Gets item by raw index
-         * @param index Index of item
-         * @return Item that is at given index
-         */
-        decltype(m_data)::reference at_raw(size_t index)
-        {
-            return m_data[index];
-        }
+    /**
+     * Type of this node.
+     *
+     * Must be `PI`.
+     */
+    node_type type = TYPE;
 
-    public:
-        /*
-         * NOTE: All methods should be *const*: Some structures depends on raw address of `m_data`
-         */
+    /**
+     * Content of processing instruction.
+     */
+    std::string_view content;
+  };
 
-        /**
-         * @brief Gets raw list of all elements
-         * @return Raw list of all elements
-         */
-        [[nodiscard]] const decltype(m_data)& all() const { return m_data; }
+  /**
+   * A struct that indicates end of element in byte stream.
+   */
+  struct end {
+    static constexpr auto TYPE = node_type::END_OF_ELEMENT;
 
-        /**
-         * @brief Gets all siblings of the element at zero index
-         * @return All siblings of the element at zero index
-         */
-        [[nodiscard]] node_view view() const { return node_view{ &m_data[0] }; }
+    /**
+     * Type of this node.
+     *
+     * Must be `END_OF_ELEMENT`.
+     */
+    node_type type = TYPE;
+  };
 
-        /**
-         * @brief Gets all descendants of the element at zero index
-         * @return All descendants of the element at zero index
-         */
-        [[nodiscard]] node_descendants_view descendants_view() const { return node_descendants_view{ &m_data[0] }; }
-    };
-
-#define FRXML_STD_PARAMS const char* __restrict& start, const char* __restrict end, size_t& size
-
-    class doc
-    {
-        node_vector m_buffer;
-        size_t      m_size;
-        error       m_code;
-        ptrdiff_t   m_error;
-
-        [[nodiscard]] error ParsePI(FRXML_STD_PARAMS);
-
-        [[nodiscard]] error ParseComment(FRXML_STD_PARAMS);
-
-        [[nodiscard]] error ParseETag(FRXML_STD_PARAMS, std::string_view* tag);
-
-        [[nodiscard]] error ParseMisc(FRXML_STD_PARAMS, std::string_view* tag);
-
-        [[nodiscard]] error ParseMiscVec(FRXML_STD_PARAMS);
-
-        [[nodiscard]] error ParseElement(FRXML_STD_PARAMS);
-
-        [[nodiscard]] error ParseElementLike(FRXML_STD_PARAMS, std::string_view* tag);
-
-    public:
-        /**
-         * @brief Parses xml string into DOM
-         * @param str A string-view of xml string
-         */
-        FRXML_EXPORT explicit doc(std::string_view str);
-
-        /**
-         * @brief Validates this document
-         * @return True if the document is valid
-         */
-        [[nodiscard]] FRXML_EXPORT bool validate();
-
-        /**
-         * @brief Determines if this document can be used
-         * @return True if it cannot be used, otherwise false
-         */
-        FRXML_EXPORT bool operator!() const;
-
-        /**
-         * @brief Gets error code
-         * @return 0 or greater than 0 when job completed successfully, otherwise less than 0
-         */
-        [[nodiscard]] FRXML_EXPORT error exception() const;
-
-        /**
-         * Gets offset of source that occurs error during job
-         * @return Offset of source (source string for parsing, source node for validation)
-         */
-        [[nodiscard]] FRXML_EXPORT size_t offset() const;
-
-        /**
-         * @brief Gets all descendants of this document
-         * @return Descendants of this document
-         */
-        FRXML_EXPORT decltype(m_buffer)& children();
-
-        /**
-         * @copydoc children
-         */
-        [[nodiscard]] FRXML_EXPORT const decltype(m_buffer)& children() const;
-    };
+  /**
+   * Parses xml document.
+   *
+   * When it fails, It returns zero,
+   * and An error message will be placed in `buffer`;
+   * Otherwise, node data will be stored in `buffer`.
+   *
+   * @return
+   * Root element of document.
+   * Non-zero if parsing succeeded; otherwise, zero.
+   */
+  FRXML_EXPORT const element *parse(std::string_view str, const std::vector<uint8_t> &buffer);
 }
 
 #endif //FRXML_LIBRARY_H
