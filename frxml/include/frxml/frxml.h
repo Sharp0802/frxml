@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "frxml/string.h"
+
 #define FRXML_EXPORT __attribute__((visibility("default")))
 
 namespace frxml {
@@ -217,7 +219,7 @@ namespace frxml {
 
   inline node_iterator<attr> element::attrs() const {
     using namespace details;
-    
+
     const void *next = skip_node(this);
     return node_iterator{static_cast<const attr*>(next)};
   }
