@@ -1,11 +1,8 @@
-#ifndef FRXML_LIBRARY_H
-#define FRXML_LIBRARY_H
+#pragma once
 
 #include <cstdint>
 #include <string>
 #include <vector>
-
-#include "frxml/string.h"
 
 #define FRXML_EXPORT __attribute__((visibility("default")))
 
@@ -16,7 +13,8 @@ namespace frxml {
     ATTR           = 2,
     COMMENT        = ELEMENT | 4,
     PI             = ELEMENT | 8,
-    END_OF_ELEMENT = 16
+    TEXT           = ELEMENT | 16,
+    END_OF_ELEMENT = 32
   };
 
   template<typename T>
@@ -156,6 +154,25 @@ namespace frxml {
   };
 
   /**
+   * A struct for text node.
+   */
+  struct text {
+    static constexpr auto TYPE = node_type::TEXT;
+
+    /**
+     * Type of this node.
+     *
+     * Must be `TEXT`.
+     */
+    node_type type = TYPE;
+
+    /**
+     * Content of text.
+     */
+    std::string_view content;
+  };
+
+  /**
    * A struct that indicates end of element in byte stream.
    */
   struct end {
@@ -224,5 +241,3 @@ namespace frxml {
     return node_iterator{static_cast<const attr*>(next)};
   }
 }
-
-#endif //FRXML_LIBRARY_H
