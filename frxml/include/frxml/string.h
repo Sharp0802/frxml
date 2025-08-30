@@ -1,5 +1,10 @@
 #pragma once
 
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <utility>
+
 namespace frxml::details {
   template <char... chs>
   using tstring = std::integer_sequence<char, chs...>;
@@ -37,6 +42,11 @@ namespace frxml::details {
     template<char... chs>
     void skip();
 
+    [[clang::always_inline]]
+    void skip_space() {
+      skip<' ', '\r', '\n', '\t'>();
+    }
+
     template<char... chs>
     void until();
 
@@ -49,18 +59,29 @@ namespace frxml::details {
     }
   };
 
-  inline view view::substr(size_t i, size_t size) const {
-    return view(_begin + i, _begin + i + size);
+  inline view view::substr(const size_t i, const size_t size) const {
+#if _DEBUG
+    if (_begin + i + size > _end) {
+      throw std::out_of_range("string::substr() out of range");
+    }
+#endif
+    return {_begin + i, _begin + i + size};
   }
 
   template<char... chs>
   bool view::start_with() const {
+    if (eof())
+      return false;
+
     const auto ch = *_begin;
     return ((ch == chs) || ...);
   }
 
   template<char... chs>
   bool view::start_with(tstring<chs...>) const {
+    if (_end - _begin < sizeof...(chs))
+      return false;
+
     constexpr char CHS[] = {chs...};
     for (auto i = 0; i < sizeof...(chs) && _begin + i != _end; ++i) {
       if (_begin[i] != CHS[i]) {
@@ -72,19 +93,19 @@ namespace frxml::details {
 
   template<char... chs>
   void view::skip() {
-    for (; start_with<chs...>() && !eof(); ++_begin) {
+    for (; !eof() && start_with<chs...>(); ++_begin) {
     }
   }
 
   template<char... chs>
   void view::until() {
-    for (; !start_with<0, chs...>() && !eof(); ++_begin) {
+    for (; !eof() && !start_with<chs...>(); ++_begin) {
     }
   }
 
   template<char... chs>
   void view::until(tstring<chs...> t) {
-    for (; !start_with(t) && !eof(); ++_begin) {
+    for (; !eof() && !start_with(t); ++_begin) {
     }
   }
 }
