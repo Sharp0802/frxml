@@ -197,7 +197,7 @@ namespace frxml {
    * Root element of document.
    * Non-zero if parsing succeeded; otherwise, zero.
    */
-  FRXML_EXPORT const element *parse(std::string_view str, const std::vector<uint8_t> &buffer);
+  FRXML_EXPORT const element *parse(std::string_view str, std::vector<uint8_t> &buffer);
 
   namespace details {
     inline node_type operator&(node_type lhs, node_type rhs) {
@@ -240,4 +240,6 @@ namespace frxml {
     const void *next = skip_node(this);
     return node_iterator{static_cast<const attr*>(next)};
   }
+
+#include "parse.inc"
 }
