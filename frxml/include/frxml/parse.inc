@@ -141,5 +141,8 @@ state parse(const std::string_view str, context *ctx) {
     s = parse_element<callback>(ctx, view);
   } while (!view.eof() && s == OKAY);
 
+  const auto e = node_type::None;
+  callback(ctx, reinterpret_cast<const Node*>(&e));
+
   return s;
 }
