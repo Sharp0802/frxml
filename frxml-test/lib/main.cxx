@@ -16,7 +16,7 @@ struct testcase {
   std::string_view content = {nullptr, 0};
 };
 
-constexpr size_t N_TESTCASES = 2;
+constexpr size_t N_TESTCASES = 3;
 
 std::array<testcase, N_TESTCASES> testcases;
 
@@ -86,28 +86,24 @@ void prepare(ubench::args &args) {
   args = {0, 1};
 }
 
-void cb(std::vector<uint8_t> &context, const void *p, const size_t len) {
-  const auto offset = context.size();
-  context.resize(offset + len);
-  memcpy(context.data() + offset, p, len);
+void cb(std::vector<uint8_t> *context, const frxml::Node *node) {
+  const auto offset = context->size();
+  context->resize(offset + node->size());
+  memcpy(context->data() + offset, node, node->size());
 }
 
-void dummy_cb(void *, const void *, size_t) {
-}
-
-void dump_cb(void *, const void *p, size_t) {
-  frxml::dump(std::cout, p);
+void dummy_cb(void *, const frxml::Node *) {
 }
 
 [[clang::noinline]]
 void BM_frxml_zero_alloc(const ubench::arg arg) {
-  frxml::parse<dummy_cb, void*>(testcases[arg].content, nullptr);
+  frxml::parse<dummy_cb, void>(testcases[arg].content, nullptr);
 }
 
 [[clang::noinline]]
 void BM_frxml_one_alloc(const ubench::arg arg) {
   std::vector<uint8_t> buffer;
-  frxml::parse<cb, std::vector<uint8_t>>(testcases[arg].content, buffer);
+  frxml::parse<cb>(testcases[arg].content, &buffer);
 }
 
 BENCHMARK(BM_frxml_zero_alloc).prepare(prepare);
@@ -115,10 +111,7 @@ BENCHMARK(BM_frxml_one_alloc).prepare(prepare);
 
 int main() {
   prepare();
-
-  frxml::parse<dump_cb, void*>(testcases[0].content, nullptr);
-
-  //ubench::print(ubench::run());
+  ubench::print(ubench::run());
   dispose();
   return 0;
 }
