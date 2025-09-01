@@ -4,3 +4,6 @@
 [submodule "dep/benchmark"]
 	path = dep/benchmark
 	url = https://github.com/google/benchmark
+[submodule "dep/tinyxml2"]
+	path = dep/tinyxml2
+	url = https://github.com/leethomason/tinyxml2
