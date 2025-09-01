@@ -1,129 +1,108 @@
-#include <array>
 #include <cstring>
 #include <fcntl.h>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
-#include <libgen.h>
-#include <unistd.h>
-#include <linux/limits.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
+#include <pugixml.hpp>
+#include <tinyxml2.h>
+#include <benchmark/benchmark.h>
 
-#include "pugixml.hpp"
-#include "ubench.h"
 #include "frxml/frxml.h"
 
-struct testcase {
-  int fd = -1;
-  std::string_view content = {nullptr, 0};
-};
-
-constexpr size_t N_TESTCASES = 4;
-
-std::array<testcase, N_TESTCASES> testcases;
-
-void dispose() {
-  for (auto i = 0; i < N_TESTCASES; i++) {
-    auto [fd, content] = testcases[i];
-
-    if (content.data()) {
-      munmap(const_cast<char*>(content.data()), content.size());
-      testcases[i].content = {nullptr, 0};
-    }
-
-    if (fd != -1) {
-      close(fd);
-      testcases[i].fd = -1;
-    }
-  }
-}
-
-void prepare() {
-  char base[PATH_MAX];
-  if (readlink("/proc/self/exe", base, sizeof(base)) == -1) {
-    perror("/proc/self/exe");
-    return;
+#define PARSE_XML(nm, ...) \
+  static void BM_##nm(benchmark::State& state, const std::string& filepath) {         \
+    std::string xml;                                                                  \
+    uintmax_t file_size = 0;                                                          \
+                                                                                      \
+    try {                                                                             \
+      file_size = std::filesystem::file_size(filepath);                               \
+      if (std::ifstream file(filepath); file) {                                       \
+        xml.assign(std::istreambuf_iterator(file), std::istreambuf_iterator<char>()); \
+      } else {                                                                        \
+        state.SkipWithError("Could not open file: " + filepath);                      \
+        return;                                                                       \
+      }                                                                               \
+    } catch (const std::filesystem::filesystem_error& e) {                            \
+      state.SkipWithError("Filesystem error: " + std::string(e.what()));              \
+      return;                                                                         \
+    }                                                                                 \
+                                                                                      \
+    state.SetLabel(std::to_string(file_size));                                        \
+                                                                                      \
+    for (auto _ : state) { __VA_ARGS__ }                                              \
+                                                                                      \
+    state.SetBytesProcessed(static_cast<int64_t>(state.iterations() * file_size));    \
   }
 
-  const auto dir = dirname(base);
-
-  char buffer[PATH_MAX];
-
-  bool success = false;
-  for (auto i = 0; i < N_TESTCASES; ++i) {
-    success = false;
-
-    const auto size = snprintf(buffer, sizeof buffer, "%s/%d.xml", dir, i);
-    buffer[size] = 0;
-
-    const auto fd = open(buffer, O_RDONLY);
-    if (fd == -1) {
-      perror(buffer);
-      break;
-    }
-
-    testcases[i].fd = fd;
-
-    struct stat st{};
-    if (fstat(fd, &st) < 0) {
-      perror(buffer);
-      break;
-    }
-
-    const auto p = mmap(nullptr, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (p == MAP_FAILED) {
-      perror(buffer);
-      break;
-    }
-
-    testcases[i].content = std::string_view(static_cast<char*>(p), st.st_size);
-    success = true;
-  }
-  if (!success) {
-    dispose();
-  }
-}
-
-void prepare(ubench::args &args) {
-  args.resize(N_TESTCASES);
-  for (auto i = 0; i < N_TESTCASES; ++i) {
-    args[i] = i;
-  }
-}
-
-void cb(std::vector<uint8_t> *context, const frxml::Node *node) {
+static void cb(std::vector<uint8_t> *context, const frxml::Node *node) {
   const auto offset = context->size();
   context->resize(offset + node->size());
   memcpy(context->data() + offset, node, node->size());
 }
 
-void dummy_cb(void *, const frxml::Node *) {
+static void dummy_cb(void *, const frxml::Node *) {
 }
 
-[[clang::noinline]]
-void BM_frxml_zero_alloc(const ubench::arg arg) {
-  frxml::parse<dummy_cb, void>(testcases[arg].content, nullptr);
-}
+PARSE_XML(
+  frxml_dom, {
+  std::vector<uint8_t> buffer;
+  auto result = frxml::parse<cb>(xml, &buffer);
+  benchmark::DoNotOptimize(result);
+  benchmark::ClobberMemory();
+  });
 
-[[clang::noinline]]
-void BM_frxml_one_alloc(const ubench::arg arg) {
-  static std::vector<uint8_t> buffer;
-  buffer.clear();
-  frxml::parse<cb>(testcases[arg].content, &buffer);
-}
+PARSE_XML(
+  frxml_sax, {
+  auto result = frxml::parse<dummy_cb, void>(xml, nullptr);
+  benchmark::DoNotOptimize(result);
+  benchmark::ClobberMemory();
+  });
 
-[[clang::noinline]]
-void BM_pugixml(const ubench::arg arg) {
+PARSE_XML(
+  pugixml, {
   pugi::xml_document doc;
-  doc.load_buffer(testcases[arg].content.data(), testcases[arg].content.size(), pugi::parse_default, pugi::encoding_utf8);
-}
+  auto result = doc.load_buffer_inplace(xml.data(), xml.size());
+  benchmark::DoNotOptimize(result);
+  benchmark::ClobberMemory();
+  });
 
-BENCHMARK(BM_pugixml).prepare(prepare).warmup(true).iteration(100).step(50);
-BENCHMARK(BM_frxml_zero_alloc).prepare(prepare).warmup(true).iteration(100).step(50);
-BENCHMARK(BM_frxml_one_alloc).prepare(prepare).warmup(true).iteration(100).step(50);
+PARSE_XML(
+  tinyxml2, {
+  tinyxml2::XMLDocument doc;
+  auto result = doc.Parse(xml.data(), xml.size());
+  benchmark::DoNotOptimize(result);
+  benchmark::ClobberMemory();
+  });
 
-int main() {
-  prepare();
-  ubench::print(ubench::run());
-  dispose();
+const std::vector<std::string> xml_files{
+  "321gone.xml",
+  "mondial-3.0_pv.xml",
+  "part_pv.xml",
+  "reed_pv.xml",
+  "SigmodRecord_pv.xml"
+};
+
+using BenchmarkFn = void(*)(benchmark::State &, const std::string &);
+
+const std::vector<std::pair<std::string, BenchmarkFn>> benchmarks_to_run = {
+  {"frxml_dom", BM_frxml_dom},
+  {"pugixml", BM_pugixml},
+  {"frxml_sax", BM_frxml_sax},
+  {"tinyxml2", BM_tinyxml2}
+};
+
+int main(int argc, char **argv) {
+  for (const auto &[name, fn] : benchmarks_to_run) {
+    for (const auto &path : xml_files) {
+      std::string full_benchmark_name = name + "/" + path;
+      benchmark::RegisterBenchmark(full_benchmark_name, fn, path);
+    }
+  }
+
+  benchmark::Initialize(&argc, argv);
+  if (benchmark::ReportUnrecognizedArguments(argc, argv))
+    return 1;
+  benchmark::RunSpecifiedBenchmarks();
+  benchmark::Shutdown();
   return 0;
 }
