@@ -1,3 +1,6 @@
 [submodule "dep/ubench"]
 	path = dep/ubench
 	url = https://github.com/sharp0802/ubench
+[submodule "dep/pugixml"]
+	path = dep/pugixml
+	url = https://github.com/zeux/pugixml

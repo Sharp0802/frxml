@@ -8,6 +8,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 
+#include "pugixml.hpp"
 #include "ubench.h"
 #include "frxml/frxml.h"
 
@@ -16,7 +17,7 @@ struct testcase {
   std::string_view content = {nullptr, 0};
 };
 
-constexpr size_t N_TESTCASES = 3;
+constexpr size_t N_TESTCASES = 4;
 
 std::array<testcase, N_TESTCASES> testcases;
 
@@ -83,7 +84,10 @@ void prepare() {
 }
 
 void prepare(ubench::args &args) {
-  args = {0, 1};
+  args.resize(N_TESTCASES);
+  for (auto i = 0; i < N_TESTCASES; ++i) {
+    args[i] = i;
+  }
 }
 
 void cb(std::vector<uint8_t> *context, const frxml::Node *node) {
@@ -102,12 +106,20 @@ void BM_frxml_zero_alloc(const ubench::arg arg) {
 
 [[clang::noinline]]
 void BM_frxml_one_alloc(const ubench::arg arg) {
-  std::vector<uint8_t> buffer;
+  static std::vector<uint8_t> buffer;
+  buffer.clear();
   frxml::parse<cb>(testcases[arg].content, &buffer);
 }
 
-BENCHMARK(BM_frxml_zero_alloc).prepare(prepare);
-BENCHMARK(BM_frxml_one_alloc).prepare(prepare);
+[[clang::noinline]]
+void BM_pugixml(const ubench::arg arg) {
+  pugi::xml_document doc;
+  doc.load_buffer(testcases[arg].content.data(), testcases[arg].content.size(), pugi::parse_default, pugi::encoding_utf8);
+}
+
+BENCHMARK(BM_pugixml).prepare(prepare).warmup(true).iteration(100).step(50);
+BENCHMARK(BM_frxml_zero_alloc).prepare(prepare).warmup(true).iteration(100).step(50);
+BENCHMARK(BM_frxml_one_alloc).prepare(prepare).warmup(true).iteration(100).step(50);
 
 int main() {
   prepare();
