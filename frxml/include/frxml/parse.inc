@@ -10,7 +10,7 @@ namespace details {
     char... begin_chs,
     char... end_chs
   >
-  state parse_element_like(context &ctx, view &src, tstring<begin_chs...> bt, tstring<end_chs...> et) {
+  state parse_element_like(context *ctx, view &src, tstring<begin_chs...> bt, tstring<end_chs...> et) {
     if (!src.start_with(bt)) {
       return NIL;
     }
@@ -25,17 +25,14 @@ namespace details {
 
     src.forward<et.size()>();
 
-    const node_type c = {
-      .content = view(begin, end).to_std()
-    };
-
+    const node_type c(view(begin, end).to_std());
     callback(ctx, &c, sizeof c);
 
     return OKAY;
   }
 
   template<auto callback, typename context>
-  state parse_element(context &ctx, view &src) {
+  state parse_element(context *ctx, view &src) {
     const auto super_begin = src.begin();
     src.skip_space();
     if (src.eof())
@@ -47,21 +44,19 @@ namespace details {
       src.skip_until<'<'>();
       const auto end = src.begin();
 
-      const text t = {
-        .content = view(super_begin, end).to_std()
-      };
-
+      const Text t(view(super_begin, end).to_std());
       callback(ctx, &t, sizeof t);
+
       return OKAY;
     }
 
     src.forward<1>();
 
 #define __TRY_PARSE(t, begin, end) if (const auto s = parse_element_like<t, callback, context>(ctx, src, begin##_t, end##_t); s != NIL) { return s; }
-    __TRY_PARSE(comment, "!--", "-->");
-    __TRY_PARSE(pi, "?", "?>");
-    __TRY_PARSE(text, "!CDATA[", "]]>"); // cdata is considered as just text
-    __TRY_PARSE(etag, "/", ">"); // validation is for validator, not parser
+    __TRY_PARSE(Comment, "!--", "-->");
+    __TRY_PARSE(PI, "?", "?>");
+    __TRY_PARSE(Text, "!CDATA[", "]]>"); // cdata is considered as just text
+    __TRY_PARSE(ETag, "/", ">"); // validation is for validator, not parser
 #undef __TRY_PARSE
 
     const auto tag_begin = src.begin();
@@ -71,9 +66,7 @@ namespace details {
     if (src.eof())
       return UNEXPECTED_EOF;
 
-    const element e = {
-      .tag = view(tag_begin, tag_end).to_std()
-    };
+    const Element e(view(tag_begin, tag_end).to_std());
     callback(ctx, &e, sizeof e);
 
     while (true) {
@@ -81,9 +74,7 @@ namespace details {
       src.skip_space();
 
       if (src.start_with("/>"_t)) {
-        const etag etag = {
-          .content = view(tag_begin, tag_end).to_std()
-        };
+        const ETag etag(view(tag_begin, tag_end).to_std());
         callback(ctx, &etag, sizeof etag);
         src.forward<2>();
         break;
@@ -127,10 +118,10 @@ namespace details {
       if (src.eof())
         return UNEXPECTED_EOF;
 
-      const attr attr = {
-        .name = view(name_begin, name_end).to_std(),
-        .value = view(value_begin, value_end).to_std()
-      };
+      const Attribute attr(
+        view(name_begin, name_end).to_std(),
+        view(value_begin, value_end).to_std()
+      );
       callback(ctx, &attr, sizeof attr);
     }
 
@@ -139,7 +130,7 @@ namespace details {
 }
 
 template<auto callback, typename context>
-state parse(const std::string_view str, context_type_t<context> ctx) {
+state parse(const std::string_view str, context *ctx) {
   using namespace details;
 
   view view(str);
@@ -147,7 +138,7 @@ state parse(const std::string_view str, context_type_t<context> ctx) {
   state s;
   do {
     view.skip_space();
-    s = parse_element<callback, context>(ctx, view);
+    s = parse_element<callback>(ctx, view);
   } while (!view.eof() && s == OKAY);
 
   return s;
