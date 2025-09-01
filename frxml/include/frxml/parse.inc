@@ -36,8 +36,23 @@ namespace details {
 
   template<auto callback, typename context>
   state parse_element(context &ctx, view &src) {
-    if (!src.start_with<'<'>()) {
+    const auto super_begin = src.begin();
+    src.skip_space();
+    if (src.eof())
       return NIL;
+
+    if (!src.start_with<'<'>()) {
+      // Use super_begin to preserve whitespace
+      // const auto begin = src.begin();
+      src.skip_until<'<'>();
+      const auto end = src.begin();
+
+      const text t = {
+        .content = view(super_begin, end).to_std()
+      };
+
+      callback(ctx, &t, sizeof t);
+      return OKAY;
     }
 
     src.forward<1>();
@@ -65,14 +80,16 @@ namespace details {
       const auto begin = src.begin();
       src.skip_space();
 
-      if (src.start_with<'/'>()) {
+      if (src.start_with("/>"_t)) {
         const etag etag = {
           .content = view(tag_begin, tag_end).to_std()
         };
         callback(ctx, &etag, sizeof etag);
+        src.forward<2>();
         break;
       }
       if (src.start_with<'>'>()) {
+        src.forward<1>();
         break;
       }
 
@@ -88,20 +105,24 @@ namespace details {
       if (src.eof())
         return UNEXPECTED_EOF;
 
-      const auto value_begin = src.begin();
-      const char *value_end;
+      const char *value_begin;
 
       if (src.start_with<'"'>()) {
+        src.forward<1>();
+        value_begin = src.begin();
         src.skip_until<'"'>();
-        value_end = src.begin();
       }
       else if (src.start_with<'\''>()) {
+        src.forward<1>();
+        value_begin = src.begin();
         src.skip_until<'\''>();
-        value_end = src.begin();
       }
       else {
         return EXPECTED_QUOTE;
       }
+
+      const char *value_end = src.begin();
+      src.forward<1>();
 
       if (src.eof())
         return UNEXPECTED_EOF;
@@ -118,7 +139,7 @@ namespace details {
 }
 
 template<auto callback, typename context>
-state parse(const std::string_view str, context &ctx) {
+state parse(const std::string_view str, context_type_t<context> ctx) {
   using namespace details;
 
   view view(str);

@@ -75,6 +75,10 @@ namespace frxml {
     node_type type = TYPE;
     std::string_view name;
     std::string_view value;
+
+    void dump(std::ostream &os) const {
+      os << "- ATTR " << name << "=" << value;
+    }
   };
 
   /**
@@ -128,6 +132,10 @@ namespace frxml {
      */
     [[nodiscard]]
     node_iterator<attr> attrs() const;
+
+    void dump(std::ostream &os) const {
+      os << "ELEM " << tag;
+    }
   };
 
   /**
@@ -147,6 +155,10 @@ namespace frxml {
      * Content of comment.
      */
     std::string_view content;
+
+    void dump(std::ostream &os) const {
+      os << "COMMENT " << content;
+    }
   };
 
   /**
@@ -166,6 +178,10 @@ namespace frxml {
      * Content of processing instruction.
      */
     std::string_view content;
+
+    void dump(std::ostream &os) const {
+      os << "PI " << content;
+    }
   };
 
   /**
@@ -185,6 +201,10 @@ namespace frxml {
      * Content of text.
      */
     std::string_view content;
+
+    void dump(std::ostream &os) const {
+      os << "TEXT " << content;
+    }
   };
 
   /**
@@ -211,7 +231,24 @@ namespace frxml {
        */
       std::string_view content;
     };
+
+    void dump(std::ostream &os) const {
+      os << "ETAG " << tag;
+    }
   };
+
+  template<typename t>
+  struct context_type {
+    using type = t&;
+  };
+
+  template<typename t>
+  struct context_type<t*> {
+    using type = t*;
+  };
+
+  template<typename t>
+  using context_type_t = typename context_type<t>::type;
 
   /**
    * Parses xml document.
@@ -220,11 +257,18 @@ namespace frxml {
    * Otherwise, returns non-zero error code.
    *
    * See `state` for more information about error codes.
+  *
+   * @tparam callback Callback function
+   * @tparam context Type of context object
+   * @param str String view to parse
+   * @param ctx Context object
    *
    * @return Zero if parsing succeeded; Otherwise, non-zero error code.
    */
   template<auto callback, typename context>
-  state parse(std::string_view str, context &ctx);
+  state parse(std::string_view str, context_type_t<context> ctx);
+
+  inline void dump(std::ostream &os, const void *p);
 
   namespace details {
     inline node_type operator&(node_type lhs, node_type rhs) {
@@ -266,6 +310,37 @@ namespace frxml {
 
     const void *next = skip_node(this);
     return node_iterator{static_cast<const attr*>(next)};
+  }
+
+  inline void dump(std::ostream &os, const void *p) {
+    switch (const auto v = *static_cast<const node_type*>(p)) {
+    case node_type::NONE:
+      os << "NONE";
+      break;
+    case node_type::ELEMENT:
+      static_cast<const element*>(p)->dump(os);
+      break;
+    case node_type::ATTR:
+      static_cast<const attr*>(p)->dump(os);
+      break;
+    case node_type::COMMENT:
+      static_cast<const comment*>(p)->dump(os);
+      break;
+    case node_type::PI:
+      static_cast<const pi*>(p)->dump(os);
+      break;
+    case node_type::TEXT:
+      static_cast<const text*>(p)->dump(os);
+      break;
+    case node_type::END_OF_ELEMENT:
+      static_cast<const etag*>(p)->dump(os);
+      break;
+    default:
+      os << "UNKNOWN '" << static_cast<std::underlying_type_t<node_type>>(v) << '\'';
+      break;
+    }
+
+    os << '\n';
   }
 
 #define FRXML_INCLUDE_PARSE
