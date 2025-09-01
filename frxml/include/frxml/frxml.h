@@ -2,9 +2,8 @@
 
 #include <cstdint>
 #include <string>
-#include <vector>
 
-#define FRXML_EXPORT __attribute__((visibility("default")))
+#include "frxml/string.h"
 
 namespace frxml {
   enum class node_type {
@@ -15,6 +14,15 @@ namespace frxml {
     PI             = ELEMENT | 8,
     TEXT           = ELEMENT | 16,
     END_OF_ELEMENT = 32
+  };
+
+  enum state {
+    OKAY = 0,
+
+    NIL,
+    UNEXPECTED_EOF,
+    EXPECTED_SPACE,
+    EXPECTED_QUOTE
   };
 
   template<typename T>
@@ -85,10 +93,17 @@ namespace frxml {
      */
     node_type type = TYPE;
 
-    /**
-     * Tag of this node.
-     */
-    std::string_view tag;
+    union {
+      /**
+       * Tag of this node.
+       */
+      std::string_view tag;
+
+      /**
+       * Tag of this node (required for compatibility with other node types).
+       */
+      std::string_view content;
+    };
 
     /**
      * Gets children of this element.
@@ -100,7 +115,7 @@ namespace frxml {
      * @return Iterator for children of this element
      */
     [[nodiscard]]
-    FRXML_EXPORT node_iterator<element> children() const;
+    node_iterator<element> children() const;
 
     /**
      * Gets attributes of this element.
@@ -112,7 +127,7 @@ namespace frxml {
      * @return Iterator for attributes of this element
      */
     [[nodiscard]]
-    FRXML_EXPORT node_iterator<attr> attrs() const;
+    node_iterator<attr> attrs() const;
   };
 
   /**
@@ -175,7 +190,7 @@ namespace frxml {
   /**
    * A struct that indicates end of element in byte stream.
    */
-  struct end {
+  struct etag {
     static constexpr auto TYPE = node_type::END_OF_ELEMENT;
 
     /**
@@ -184,20 +199,32 @@ namespace frxml {
      * Must be `END_OF_ELEMENT`.
      */
     node_type type = TYPE;
+
+    union {
+      /**
+       * Tag of this node.
+       */
+      std::string_view tag;
+
+      /**
+       * Tag of this node (required for compatibility with other node types).
+       */
+      std::string_view content;
+    };
   };
 
   /**
    * Parses xml document.
    *
-   * When it fails, It returns zero,
-   * and An error message will be placed in `buffer`;
-   * Otherwise, node data will be stored in `buffer`.
+   * Returns zero if parsing succeeded;
+   * Otherwise, returns non-zero error code.
    *
-   * @return
-   * Root element of document.
-   * Non-zero if parsing succeeded; otherwise, zero.
+   * See `state` for more information about error codes.
+   *
+   * @return Zero if parsing succeeded; Otherwise, non-zero error code.
    */
-  FRXML_EXPORT const element *parse(std::string_view str, std::vector<uint8_t> &buffer);
+  template<auto callback, typename context>
+  state parse(std::string_view str, context &ctx);
 
   namespace details {
     inline node_type operator&(node_type lhs, node_type rhs) {
@@ -216,7 +243,7 @@ namespace frxml {
       case node_type::ATTR:
         return static_cast<const uint8_t*>(p) + sizeof(attr);
       case node_type::END_OF_ELEMENT:
-        return static_cast<const uint8_t*>(p) + sizeof(end);
+        return static_cast<const uint8_t*>(p) + sizeof(etag);
       default:
         return nullptr;
       }
@@ -241,5 +268,7 @@ namespace frxml {
     return node_iterator{static_cast<const attr*>(next)};
   }
 
+#define FRXML_INCLUDE_PARSE
 #include "parse.inc"
+#undef FRXML_INCLUDE_PARSE
 }
