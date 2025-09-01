@@ -15,8 +15,15 @@ namespace frxml::details {
   template<char... chs>
   using tstring = std::integer_sequence<char, chs...>;
 
+#if __GNUG__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wgnu-string-literal-operator-template"
+#endif
   template<typename T, T... chs>
   constexpr tstring<chs...> operator""_t() { return {}; }
+#if __GNUG__
+#pragma GCC diagnostic pop
+#endif
 
   class view {
     const char *_begin;
