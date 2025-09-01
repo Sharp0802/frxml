@@ -26,7 +26,7 @@ namespace details {
     src.forward<et.size()>();
 
     const node_type c(view(begin, end).to_std());
-    callback(ctx, &c, sizeof c);
+    callback(ctx, reinterpret_cast<const Node*>(&c));
 
     return OKAY;
   }
@@ -45,7 +45,7 @@ namespace details {
       const auto end = src.begin();
 
       const Text t(view(super_begin, end).to_std());
-      callback(ctx, &t, sizeof t);
+      callback(ctx, reinterpret_cast<const Node*>(&t));
 
       return OKAY;
     }
@@ -67,7 +67,7 @@ namespace details {
       return UNEXPECTED_EOF;
 
     const Element e(view(tag_begin, tag_end).to_std());
-    callback(ctx, &e, sizeof e);
+    callback(ctx, reinterpret_cast<const Node*>(&e));
 
     while (true) {
       const auto begin = src.begin();
@@ -75,7 +75,7 @@ namespace details {
 
       if (src.start_with("/>"_t)) {
         const ETag etag(view(tag_begin, tag_end).to_std());
-        callback(ctx, &etag, sizeof etag);
+        callback(ctx, reinterpret_cast<const Node*>(&etag));
         src.forward<2>();
         break;
       }
@@ -122,7 +122,7 @@ namespace details {
         view(name_begin, name_end).to_std(),
         view(value_begin, value_end).to_std()
       );
-      callback(ctx, &attr, sizeof attr);
+      callback(ctx, reinterpret_cast<const Node*>(&attr));
     }
 
     return OKAY;

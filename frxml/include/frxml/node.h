@@ -35,6 +35,8 @@ namespace frxml {
     template<typename T>
     constexpr node_type get_type();
 
+    constexpr size_t get_size(node_type type);
+
     constexpr const void *next_node(const void *p);
   }
 
@@ -52,7 +54,13 @@ namespace frxml {
       return (std::is_same_v<To, T> || ...);
     }
 
+    [[nodiscard]]
+    constexpr size_t size() const {
+      return details::get_size(_type);
+    }
+
     template<typename To>
+    [[nodiscard]]
     const To *as() const {
       static_assert(allows<To>(), "Casting target should be one of variadic template argument");
 
@@ -101,15 +109,7 @@ namespace frxml {
     friend bool operator!= (const NodeIterator& a, const NodeIterator& b) { return a._base != b._base; }
   };
 
-  struct Attribute {
-    __FIELD(node_type, type);
-    __FIELD(std::string_view, name)
-    __FIELD(std::string_view, value)
-
-    Attribute(const std::string_view name, const std::string_view value)
-      : _type(node_type::Attribute), _name(name), _value(value) {
-    }
-  };
+  struct Attribute;
 
   struct Element {
     __FIELD(node_type, type);
@@ -121,6 +121,16 @@ namespace frxml {
 
     [[nodiscard]] NodeIterator<Attribute> attrs() const;
     [[nodiscard]] NodeIterator<Element> children() const;
+  };
+
+  struct Attribute {
+    __FIELD(node_type, type);
+    __FIELD(std::string_view, name)
+    __FIELD(std::string_view, value)
+
+    Attribute(const std::string_view name, const std::string_view value)
+      : _type(node_type::Attribute), _name(name), _value(value) {
+    }
   };
 
   struct Comment {
@@ -159,7 +169,7 @@ namespace frxml {
     }
   };
 
-  using Node = Variant<Element, Comment, PI, Text, ETag>;
+  using Node = Variant<Element, Attribute, Comment, PI, Text, ETag>;
 
 #undef __DEFAULT_NEXT
 #undef __FIELD
@@ -238,6 +248,32 @@ namespace frxml {
       } while (next && level > 0);
 
       return next;
+    }
+  }
+
+  inline void print(std::ostream &os, const Node *p) {
+    switch (details::get_type(p)) {
+    case node_type::None:
+      os << "None";
+      break;
+    case node_type::Element:
+      os << "Element " << p->as<Element>()->tag();
+      break;
+    case node_type::Attribute:
+      os << "Attribute " << p->as<Attribute>()->name() << "=\"" << p->as<Attribute>()->value() << '"';
+      break;
+    case node_type::Comment:
+      os << "Comment " << p->as<Comment>()->content();
+      break;
+    case node_type::PI:
+      os << "PI " << p->as<PI>()->content();
+      break;
+    case node_type::Text:
+      os << "Text " << p->as<Text>()->content();
+      break;
+    case node_type::ETag:
+      os << "ETag " << p->as<ETag>()->tag();
+      break;
     }
   }
 }
