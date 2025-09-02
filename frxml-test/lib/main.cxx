@@ -1,8 +1,6 @@
 #include <cstring>
-#include <fcntl.h>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <pugixml.hpp>
 #include <tinyxml2.h>
 #include <benchmark/benchmark.h>
@@ -44,6 +42,11 @@ static void dummy_cb(void *, const frxml::Node *) {
 }
 
 PARSE_XML(
+  strlen, {
+  benchmark::DoNotOptimize(strlen(xml.data()));
+  })
+
+PARSE_XML(
   frxml_dom, {
   std::vector<uint8_t> buffer;
   auto result = frxml::parse<cb>(xml, &buffer);
@@ -60,8 +63,11 @@ PARSE_XML(
 
 PARSE_XML(
   pugixml, {
+  state.PauseTiming();
+  std::string copy = xml;
+  state.ResumeTiming();
   pugi::xml_document doc;
-  auto result = doc.load_buffer_inplace(xml.data(), xml.size());
+  auto result = doc.load_buffer_inplace(copy.data(), copy.size());
   benchmark::DoNotOptimize(result);
   benchmark::ClobberMemory();
   });
@@ -85,6 +91,7 @@ const std::vector<std::string> xml_files{
 using BenchmarkFn = void(*)(benchmark::State &, const std::string &);
 
 const std::vector<std::pair<std::string, BenchmarkFn>> benchmarks_to_run = {
+  {"strlen", BM_strlen},
   {"frxml_dom", BM_frxml_dom},
   {"pugixml", BM_pugixml},
   {"frxml_sax", BM_frxml_sax},
