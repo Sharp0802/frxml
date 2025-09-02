@@ -80,18 +80,10 @@ PARSE_XML(
   benchmark::ClobberMemory();
   });
 
-const std::vector<std::string> xml_files{
-  "321gone.xml",
-  "mondial-3.0_pv.xml",
-  "part_pv.xml",
-  "reed_pv.xml",
-  "SigmodRecord_pv.xml"
-};
-
 using BenchmarkFn = void(*)(benchmark::State &, const std::string &);
 
 const std::vector<std::pair<std::string, BenchmarkFn>> benchmarks_to_run = {
-  {"strlen", BM_strlen},
+  //{"strlen", BM_strlen},
   {"frxml_dom", BM_frxml_dom},
   {"pugixml", BM_pugixml},
   {"frxml_sax", BM_frxml_sax},
@@ -100,9 +92,11 @@ const std::vector<std::pair<std::string, BenchmarkFn>> benchmarks_to_run = {
 
 int main(int argc, char **argv) {
   for (const auto &[name, fn] : benchmarks_to_run) {
-    for (const auto &path : xml_files) {
-      std::string full_benchmark_name = name + "/" + path;
-      benchmark::RegisterBenchmark(full_benchmark_name, fn, path);
+    for (const auto& path : std::filesystem::directory_iterator(std::filesystem::current_path())) {
+      if (path.path().filename().extension() == ".xml") {
+        std::string full_benchmark_name = name + "/" + path.path().filename().string();
+        benchmark::RegisterBenchmark(full_benchmark_name, fn, path.path().string());
+      }
     }
   }
 
